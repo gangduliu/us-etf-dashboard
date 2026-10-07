@@ -1,8 +1,8 @@
 import os
 
 # 本地代理软件的 HTTP/SOCKS 端口
-os.environ['HTTP_PROXY'] = 'http://127.0.0.1:10808'
-os.environ['HTTPS_PROXY'] = 'http://127.0.0.1:10808'
+# os.environ['HTTP_PROXY'] = 'http://127.0.0.1:10808'
+# os.environ['HTTPS_PROXY'] = 'http://127.0.0.1:10808'
 
 
 import streamlit as st
