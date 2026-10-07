@@ -1,8 +1,8 @@
 import os
 
 # 本地代理软件的 HTTP/SOCKS 端口
-# os.environ['HTTP_PROXY'] = 'http://127.0.0.1:10808'
-# os.environ['HTTPS_PROXY'] = 'http://127.0.0.1:10808'
+os.environ['HTTP_PROXY'] = 'http://127.0.0.1:10808'
+os.environ['HTTPS_PROXY'] = 'http://127.0.0.1:10808'
 
 
 import streamlit as st
@@ -399,11 +399,71 @@ st.write("") # 增加适度空行
 # ==========================================
 tab1, tab2, tab3 = st.tabs(["📊 价格走势与投资计算器", "🧩 行业分布与重仓股", "💰 历史回报与分红"])
 
+# ==========================================
+# 估值与投资策略评估逻辑
+# ==========================================
+def analyze_buy_signal(hist, latest_price, week_52_high, week_52_low):
+    # 1. 计算 200 日均线 (MA200)
+    ma200 = hist['Close'].tail(200).mean() if len(hist) >= 200 else hist['Close'].mean()
+    
+    # 2. 计算当前价格处于 52 周范围的百分比区间 (0% = 最低, 100% = 最高)
+    range_52 = week_52_high - week_52_low
+    position_52w = ((latest_price - week_52_low) / range_52 * 100) if range_52 > 0 else 50
+    
+    # 3. 价格相对于 MA200 的偏离度
+    ma_bias = ((latest_price - ma200) / ma200) * 100
+    
+    # 4. 综合建议逻辑判断
+    if latest_price < ma200:
+        signal_title = "🟢 具备较高性价比 / 黄金加仓期"
+        signal_desc = f"当前价格已低于 200 日均线 (${ma200:.2f})，处于中长期价值区间。对于长期投资者而言，具备较好的分批建仓/大额加仓性价比。"
+        badge_color = "#166534" # 深绿
+        badge_bg = "#DCFCE7"
+    elif position_52w > 85 and ma_bias > 8:
+        signal_title = "🟡 处于短期高位 / 建议逢低定投"
+        signal_desc = f"价格靠近 52 周高点附近（偏离 200 日均线 {ma_bias:+.1f}%），短期可能有震荡回调风险。建议避免一次性重仓追高，优先采取**分批定投策略**。"
+        badge_color = "#854D0E" # 黄色
+        badge_bg = "#FEF9C3"
+    else:
+        signal_title = "🔵 趋势健康 / 适合定期定额常态化配置"
+        signal_desc = f"价格保持在 200 日均线 (${ma200:.2f}) 之上运行，整体上升趋势健全。适合按既定计划进行**常规定投**。"
+        badge_color = "#1E40AF" # 蓝色
+        badge_bg = "#DBEAFE"
+        
+    return {
+        "title": signal_title,
+        "desc": signal_desc,
+        "ma200": ma200,
+        "position_52w": position_52w,
+        "ma_bias": ma_bias,
+        "badge_color": badge_color,
+        "badge_bg": badge_bg
+    }
+
+# 得到分析结果
+buy_advice = analyze_buy_signal(hist, latest_price, week_52_high, week_52_low)
 
 # ------------------------------------------
 # Tab 1: 价格走势与投资计算器
 # ------------------------------------------
 with tab1:
+    # 投资建议 UI Banner
+    st.markdown(f"""
+    <div style="background-color: {buy_advice['badge_bg']}; border-left: 5px solid {buy_advice['badge_color']}; padding: 16px 20px; border-radius: 8px; margin-bottom: 20px;">
+        <div style="font-size: 1.1rem; font-weight: 700; color: {buy_advice['badge_color']}; margin-bottom: 6px;">
+            {buy_advice['title']}
+        </div>
+        <div style="font-size: 0.9rem; color: #334155; line-height: 1.5;">
+            {buy_advice['desc']}
+        </div>
+        <div style="margin-top: 10px; font-size: 0.82rem; color: #64748B; display: flex; gap: 20px;">
+            <span>200日均线 (MA200): <b>${buy_advice['ma200']:.2f}</b></span>
+            <span>MA200 乖离率: <b>{buy_advice['ma_bias']:+.1f}%</b></span>
+            <span>52周相对分位数: <b>{buy_advice['position_52w']:.1f}%</b></span>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+    
     col_chart, col_calc = st.columns([2.2, 1])
     
     with col_chart:
