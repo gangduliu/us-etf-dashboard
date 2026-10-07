@@ -8,13 +8,12 @@ import os
 import streamlit as st
 import pandas as pd
 import plotly.express as px
-from datetime import datetime
 
 # 导入自定义模块
 from data import (
     ETF_METADATA, load_etf_data, load_etf_holdings_and_sectors, 
     load_all_historical_returns, filter_by_range, calculate_ttm_dividend_yield,
-    get_etf_aum
+    get_etf_aum, get_range_years_limit
 )
 from strategy import analyze_buy_signal
 from ui import (
@@ -98,7 +97,7 @@ with tab1:
         st.markdown(f'<div class="section-title">📉 {selected_ticker} 历史价格走势曲线</div>', unsafe_allow_html=True)
         fig_price = px.line(
             filtered_hist, 
-            x=filtered_hist.index, 
+            x=filtered_hist.index,  # type: ignore
             y='Close',
             labels={'Close': '收盘价 (USD)', 'Date': '日期'},
             template="plotly"
@@ -189,17 +188,20 @@ with tab2:
             height=360
         )
 
-# Tab 3: 历史回报与分红
+# Tab 3: 历史回报与分红 (联动 time_range)
 with tab3:
     col_annual, col_div = st.columns([1, 1])
+    years_limit = get_range_years_limit(time_range)
+    
     with col_annual:
-        st.markdown('<div class="section-title">📅 近 10 年年度收益率 (%)</div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="section-title">📅 {"近 " + time_range if time_range != "Max" else "全历史"} 年度收益率 (%)</div>', unsafe_allow_html=True)
         annual_hist = hist['Close'].resample('YE').last()
         annual_returns = annual_hist.pct_change().dropna() * 100
         annual_df = pd.DataFrame({
             "Year": annual_returns.index.year, # type: ignore
             "Return": annual_returns.values
-        }).tail(10)
+        }).tail(years_limit)  # 👈 联动限制显示年数
+        
         annual_df['Color'] = annual_df['Return'].apply(lambda x: '#0F766E' if x >= 0 else '#F43F5E')
         
         fig_bar = px.bar(
@@ -223,11 +225,12 @@ with tab3:
         st.plotly_chart(fig_bar, use_container_width=True)
 
     with col_div:
-        st.markdown('<div class="section-title">💵 每股年度累计分红 (USD)</div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="section-title">💵 {"近 " + time_range if time_range != "Max" else "全历史"} 每股年度分红 (USD)</div>', unsafe_allow_html=True)
         if not dividends.empty:
             div_df = dividends.resample('YE').sum().reset_index()
             div_df['Year'] = div_df['Date'].dt.year
-            div_df = div_df[div_df['Year'] >= datetime.now().year - 10]
+            # 👈 动态根据选择的时间跨度筛选分红历史
+            div_df = div_df.tail(years_limit)
             
             fig_div = px.line(
                 div_df, 
@@ -256,11 +259,17 @@ with tab3:
         else:
             st.info("暂无分红数据")
 
-# Tab 4: 收益对比页
+# Tab 4: 收益对比页 (联动 time_range)
 with tab4:
     try:
-        df_compare = load_all_historical_returns(["VOO", "VGT", "SCHD"])
-        render_comparison_chart(df_compare)
+        # 获取三大 ETF 的历史收益数据并按 time_range 筛选
+        df_compare_all = load_all_historical_returns(["VOO", "VGT", "SCHD"])
+        df_compare_filtered = filter_by_range(df_compare_all, time_range) # 👈 动态联动切片
+        
+        # 重新归一化基准：使筛选起点的第一天收益率重新对齐为 0%
+        if not df_compare_filtered.empty: # type: ignore
+            df_compare_normalized = df_compare_filtered - df_compare_filtered.iloc[0] # type: ignore
+            render_comparison_chart(df_compare_normalized, time_range)
     except Exception as e:
         st.error(f"加载对比数据失败: {e}")
 

@@ -176,9 +176,10 @@ def render_advice_card(advice):
     """, unsafe_allow_html=True)
 
 
-def render_comparison_chart(df_compare):
-    """渲染三标的收益对比折线图，调配色系"""
-    st.markdown('<div class="section-title">⚔️ VOO / VGT / SCHD 近 10 年累计收益率比拼 (%)</div>', unsafe_allow_html=True)
+def render_comparison_chart(df_compare, time_range):
+    """渲染 VOO / VGT / SCHD 多标的收益率对比折线图 (响应时间跨度)"""
+    title_text = "全历史" if time_range == "Max" else f"近 {time_range}"
+    st.markdown(f'<div class="section-title">⚔️ VOO / VGT / SCHD {title_text}累计收益率比拼 (%)</div>', unsafe_allow_html=True)
     
     fig = px.line(
         df_compare, 
@@ -186,7 +187,7 @@ def render_comparison_chart(df_compare):
         y=df_compare.columns,
         labels={'value': '累计收益率 (%)', 'Date': '日期', 'variable': '标的'},
         template="plotly",
-        color_discrete_sequence=['#0F766E', '#2DD4BF', '#0284C7'] # VOO, VGT, SCHD 区分调色
+        color_discrete_sequence=['#0F766E', '#2DD4BF', '#0284C7']
     )
     fig.update_traces(line_width=2.5)
     fig.update_layout(

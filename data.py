@@ -97,7 +97,7 @@ def load_all_historical_returns(tickers=["VOO", "VGT", "SCHD"]):
     """获取多标的归一化（以初始 100 基准）走势数据，用于全景对比图"""
     df_combined = pd.DataFrame()
     for t in tickers:
-        hist = yf.Ticker(t).history(period="10y")
+        hist = yf.Ticker(t).history(period="max")
         if not hist.empty:
             hist.index = hist.index.tz_localize(None) # type: ignore
             close = hist['Close']
@@ -108,6 +108,10 @@ def load_all_historical_returns(tickers=["VOO", "VGT", "SCHD"]):
 
 
 def filter_by_range(df, range_str):
+    """根据时间范围筛选单标的或多标的历史数据/分红数据"""
+    if df is None or df.empty:
+        return df
+    
     now = datetime.now()
     if range_str == "1Y":
         start = now - timedelta(days=365)
@@ -117,9 +121,22 @@ def filter_by_range(df, range_str):
         start = now - timedelta(days=365*5)
     elif range_str == "10Y":
         start = now - timedelta(days=365*10)
-    else:
+    else:  # "Max"
         return df
+        
     return df[df.index >= start]
+
+
+def get_range_years_limit(range_str):
+    """根据时间跨度选项返回显示的最多年份数量 (供 Tab 3 年度柱状图使用)"""
+    mapping = {
+        "1Y": 1,
+        "3Y": 3,
+        "5Y": 5,
+        "10Y": 10,
+        "Max": 30
+    }
+    return mapping.get(range_str, 10)
 
 
 def calculate_ttm_dividend_yield(dividends, latest_price, info):
