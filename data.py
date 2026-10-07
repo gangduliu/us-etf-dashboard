@@ -3,13 +3,32 @@ import yfinance as yf
 import pandas as pd
 from datetime import datetime, timedelta
 
+# ETF 元数据映射 (名称与描述)
+ETF_METADATA = {
+    "VOO": {
+        "name": "Vanguard S&P 500 ETF",
+        "category": "标普 500 宽基",
+        "desc": "追踪标普 500 指数，包含美国 500 家顶尖上市公司，是全球最具代表性的宽基 ETF 之一。"
+    },
+    "VGT": {
+        "name": "Vanguard Information Technology ETF",
+        "category": "科技行业主题",
+        "desc": "专注美国信息技术行业，重仓苹果、微软、英伟达等科技巨头，具备高成长性与高波动特征。"
+    },
+    "SCHD": {
+        "name": "Schwab U.S. Dividend Equity ETF",
+        "category": "高股息成长",
+        "desc": "追踪道琼斯美国 100 红利指数，筛选连续 10 年派息且基本面强劲的高股息优质企业。"
+    }
+}
+
 @st.cache_data(ttl=3600)
-def load_voo_data():
-    """获取 VOO 历史价格、info 字典以及分红数据"""
-    ticker = yf.Ticker("VOO")
+def load_etf_data(ticker_symbol="VOO"):
+    """通用获取 ETF 历史价格、info 字典以及分红数据"""
+    ticker = yf.Ticker(ticker_symbol)
     hist = ticker.history(period="max")
     if hist.empty:
-        raise ValueError("未能获取到历史价格数据")
+        raise ValueError(f"未能获取到 {ticker_symbol} 的历史价格数据")
     hist.index = hist.index.tz_localize(None) # type: ignore
     
     info_raw = ticker.info
@@ -23,9 +42,9 @@ def load_voo_data():
 
 
 @st.cache_data(ttl=86400)
-def load_voo_holdings_and_sectors():
-    """获取实时行业分布与 Top 10 重仓股 (带自动兜底逻辑)"""
-    ticker = yf.Ticker("VOO")
+def load_etf_holdings_and_sectors(ticker_symbol="VOO"):
+    """通用获取实时行业分布与 Top 10 重仓股 (含静态兜底)"""
+    ticker = yf.Ticker(ticker_symbol)
     sector_df = pd.DataFrame()
     holdings_df = pd.DataFrame()
     
@@ -47,25 +66,47 @@ def load_voo_holdings_and_sectors():
     except Exception:
         pass
 
-    # 兜底数据
-    if sector_df.empty:
-        sector_df = pd.DataFrame({
-            "Sector": ["信息技术", "金融", "医疗健康", "可选消费", "通讯服务", "工业", "必需消费", "其他"],
-            "Weight": [31.5, 13.2, 11.8, 10.2, 8.9, 8.3, 5.8, 10.3]
-        })
-        
-    if holdings_df.empty:
-        holdings_df = pd.DataFrame({
-            "Ticker": ["AAPL", "MSFT", "NVDA", "AMZN", "META", "GOOGL", "BRK.B", "LLY", "AVGO", "TSLA"],
-            "Company": ["Apple Inc.", "Microsoft Corp.", "NVIDIA Corp.", "Amazon.com Inc.", "Meta Platforms", "Alphabet Inc.", "Berkshire Hathaway", "Eli Lilly", "Broadcom Inc.", "Tesla Inc."],
-            "Weight (%)": [6.8, 6.5, 6.1, 3.6, 2.4, 2.0, 1.7, 1.5, 1.4, 1.3]
-        })
+    # 针对不同标的的兜底数据
+    if sector_df.empty or holdings_df.empty:
+        fallback_data = {
+            "VOO": {
+                "sectors": pd.DataFrame({"Sector": ["信息技术", "金融", "医疗健康", "可选消费", "通讯服务", "工业", "其他"], "Weight": [31.5, 13.2, 11.8, 10.2, 8.9, 8.3, 16.1]}),
+                "holdings": pd.DataFrame({"Ticker": ["AAPL", "MSFT", "NVDA", "AMZN", "META", "GOOGL", "BRK.B", "LLY", "AVGO", "TSLA"], "Company": ["Apple Inc.", "Microsoft Corp.", "NVIDIA Corp.", "Amazon.com Inc.", "Meta Platforms", "Alphabet Inc.", "Berkshire Hathaway", "Eli Lilly", "Broadcom Inc.", "Tesla Inc."], "Weight (%)": [6.8, 6.5, 6.1, 3.6, 2.4, 2.0, 1.7, 1.5, 1.4, 1.3]})
+            },
+            "VGT": {
+                "sectors": pd.DataFrame({"Sector": ["软件服务", "半导体", "技术硬件", "电子设备", "其他"], "Weight": [38.2, 32.5, 22.1, 5.2, 2.0]}),
+                "holdings": pd.DataFrame({"Ticker": ["AAPL", "MSFT", "NVDA", "AVGO", "CRM", "AMD", "ACN", "ADBE", "ORCL", "CSCO"], "Company": ["Apple Inc.", "Microsoft Corp.", "NVIDIA Corp.", "Broadcom Inc.", "Salesforce Inc.", "AMD", "Accenture", "Adobe Inc.", "Oracle Corp.", "Cisco Systems"], "Weight (%)": [16.2, 14.5, 13.8, 4.5, 2.8, 2.2, 2.1, 2.0, 1.9, 1.8]})
+            },
+            "SCHD": {
+                "sectors": pd.DataFrame({"Sector": ["金融", "医疗健康", "工业", "必需消费", "信息技术", "能源", "其他"], "Weight": [17.5, 16.2, 15.8, 14.1, 11.2, 9.8, 15.4]}),
+                "holdings": pd.DataFrame({"Ticker": ["HD", "ABBV", "KO", "CVX", "MRK", "PEP", "AMGN", "VZ", "TXN", "LMT"], "Company": ["Home Depot", "AbbVie Inc.", "Coca-Cola Co.", "Chevron Corp.", "Merck & Co.", "PepsiCo Inc.", "Amgen Inc.", "Verizon", "Texas Instruments", "Lockheed Martin"], "Weight (%)": [4.2, 4.1, 4.0, 3.9, 3.8, 3.7, 3.6, 3.5, 3.4, 3.3]})
+            }
+        }
+        target_fallback = fallback_data.get(ticker_symbol, fallback_data["VOO"])
+        if sector_df.empty:
+            sector_df = target_fallback["sectors"]
+        if holdings_df.empty:
+            holdings_df = target_fallback["holdings"]
 
     return sector_df, holdings_df
 
 
+@st.cache_data(ttl=3600)
+def load_all_historical_returns(tickers=["VOO", "VGT", "SCHD"]):
+    """获取多标的归一化（以初始 100 基准）走势数据，用于全景对比图"""
+    df_combined = pd.DataFrame()
+    for t in tickers:
+        hist = yf.Ticker(t).history(period="10y")
+        if not hist.empty:
+            hist.index = hist.index.tz_localize(None) # type: ignore
+            close = hist['Close']
+            # 归一化为百分比累计收益率
+            normalized = (close / close.iloc[0] - 1) * 100
+            df_combined[t] = normalized
+    return df_combined.dropna()
+
+
 def filter_by_range(df, range_str):
-    """根据时间范围筛选历史数据"""
     now = datetime.now()
     if range_str == "1Y":
         start = now - timedelta(days=365)
@@ -81,7 +122,6 @@ def filter_by_range(df, range_str):
 
 
 def calculate_ttm_dividend_yield(dividends, latest_price, info):
-    """根据过去 365 天真实派息计算精确 TTM 股息率"""
     if not dividends.empty:
         one_year_ago = datetime.now() - timedelta(days=365)
         recent_divs = dividends[dividends.index >= one_year_ago]
@@ -89,5 +129,5 @@ def calculate_ttm_dividend_yield(dividends, latest_price, info):
         if latest_price > 0:
             return (ttm_dividends / latest_price) * 100
             
-    raw_yield = info.get('dividendYield', 0.012)
+    raw_yield = info.get('dividendYield', 0.015)
     return raw_yield * 100 if raw_yield < 0.2 else raw_yield

@@ -156,12 +156,12 @@ def inject_custom_css(theme):
     """, unsafe_allow_html=True)
 
 
-def render_header():
-    """渲染顶部 Header Banner"""
+def render_header(selected_ticker, meta):
+    """渲染支持标的切替的 Header Banner"""
     st.markdown(f"""
     <div class="header-banner">
-        <h1>📈 Vanguard S&P 500 ETF (VOO)</h1>
-        <p>实时跟踪标普 500 指数 | 更新时间: {datetime.now().strftime('%Y-%m-%d %H:%M')}</p>
+        <h1>📈 {meta['name']} ({selected_ticker})</h1>
+        <p>定位：<b>{meta['category']}</b> | {meta['desc']} | 更新时间: {datetime.now().strftime('%Y-%m-%d %H:%M')}</p>
     </div>
     """, unsafe_allow_html=True)
 
@@ -219,3 +219,26 @@ def render_advice_card(advice):
         </div>
     </div>
     """, unsafe_allow_html=True)
+
+def render_comparison_chart(df_compare, theme):
+    """渲染 VOO vs VGT vs SCHD 10年累计收益率对比图"""
+    st.markdown('<div class="section-title">⚔️ VOO / VGT / SCHD 近 10 年累计收益率比拼 (%)</div>', unsafe_allow_html=True)
+    
+    fig = px.line(
+        df_compare, 
+        x=df_compare.index, 
+        y=df_compare.columns,
+        labels={'value': '累计收益率 (%)', 'Date': '日期', 'variable': '标的'},
+        template=theme['PLOTLY_TEMPLATE']
+    )
+    fig.update_traces(line_width=2.5)
+    fig.update_layout(
+        height=380,
+        margin=dict(l=0, r=0, t=10, b=0),
+        hovermode="x unified",
+        paper_bgcolor='rgba(0,0,0,0)',
+        plot_bgcolor='rgba(0,0,0,0)',
+        xaxis=dict(showgrid=False),
+        yaxis=dict(showgrid=True, gridcolor=theme['THEME_BORDER'], title="累计收益率 (%)")
+    )
+    st.plotly_chart(fig, use_container_width=True)

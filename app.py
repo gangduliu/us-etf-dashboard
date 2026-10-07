@@ -6,53 +6,66 @@ import os
 
 
 import streamlit as st
-import yfinance as yf
 import pandas as pd
 import plotly.express as px
-from datetime import datetime, timedelta
+from datetime import datetime
 
 # 导入自定义模块
-from data import load_voo_data, load_voo_holdings_and_sectors, filter_by_range, calculate_ttm_dividend_yield
+from data import (
+    ETF_METADATA, load_etf_data, load_etf_holdings_and_sectors, 
+    load_all_historical_returns, filter_by_range, calculate_ttm_dividend_yield
+)
 from strategy import analyze_buy_signal
-from ui import get_theme_config, inject_custom_css, render_header, render_kpi_cards, render_advice_card
+from ui import (
+    get_theme_config, inject_custom_css, render_header, 
+    render_kpi_cards, render_advice_card, render_comparison_chart
+)
 
 # 1. 页面基本配置
 st.set_page_config(
-    page_title="VOO Dashboard",
+    page_title="US ETF Dashboard",
     page_icon="📈",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
-# 2. 侧边栏及主题初始化
+# 2. 侧边栏：标的选择器与参数配置
 if "dark_mode" not in st.session_state:
     st.session_state.dark_mode = False
 
 with st.sidebar:
+    st.markdown("### 🎯 标的选择")
+    selected_ticker = st.selectbox(
+        "选择要查看的 ETF",
+        options=["VOO", "VGT", "SCHD"],
+        index=0
+    )
+    
+    st.divider()
     st.markdown("### ⚙️ 看板配置")
-    st.caption("界面与数据参数")
     st.session_state.dark_mode = st.toggle("🌙 深色模式 (Dark Mode)", value=st.session_state.dark_mode)
     
     time_range = st.selectbox(
         "时间跨度筛选",
         options=["1Y", "3Y", "5Y", "10Y", "Max"],
-        index=2
+        index=3
     )
 
-# 3. 加载数据与主题设置
+# 3. 主题与数据加载
 theme = get_theme_config(st.session_state.dark_mode)
 inject_custom_css(theme)
+meta = ETF_METADATA[selected_ticker]
 
 try:
-    hist, info, dividends = load_voo_data()
-    sector_data, top_holdings = load_voo_holdings_and_sectors()
+    hist, info, dividends = load_etf_data(selected_ticker)
+    sector_data, top_holdings = load_etf_holdings_and_sectors(selected_ticker)
 except Exception as e:
-    st.error(f"获取数据失败，请检查网络设置或稍后再试: {e}")
+    st.error(f"获取 {selected_ticker} 数据失败，请检查网络设置: {e}")
     st.stop()
 
 filtered_hist = filter_by_range(hist, time_range)
 
-# 计算指标数据
+# 计算核心指标
 latest_price = hist['Close'].iloc[-1]
 prev_price = hist['Close'].iloc[-2]
 price_change = latest_price - prev_price
@@ -61,17 +74,25 @@ pct_change = (price_change / prev_price) * 100
 week_52_high = info.get('fiftyTwoWeekHigh', hist['Close'].tail(252).max())
 week_52_low = info.get('fiftyTwoWeekLow', hist['Close'].tail(252).min())
 div_yield = calculate_ttm_dividend_yield(dividends, latest_price, info)
-expense_ratio = 0.03
+# 获取费率 (VGT 0.10%, VOO 0.03%, SCHD 0.06%)
+expense_ratio = info.get('expenseRatio', 0.03 if selected_ticker=="VOO" else (0.10 if selected_ticker=="VGT" else 0.06))
+if isinstance(expense_ratio, (int, float)) and expense_ratio < 0.01:
+    expense_ratio = expense_ratio * 100
 total_assets = info.get('totalAssets', 0)
 
-# 4. 渲染 Header 与 KPI 指标栏
-render_header()
+# 4. 渲染 Banner & KPI 卡片
+render_header(selected_ticker, meta)
 render_kpi_cards(latest_price, price_change, pct_change, week_52_high, week_52_low, div_yield, expense_ratio, total_assets)
 
-# 5. 渲染 Tabs
-tab1, tab2, tab3 = st.tabs(["📊 价格走势与投资计算器", "🧩 行业分布与重仓股", "💰 历史回报与分红"])
+# 5. 渲染 Tabs（新增对比页）
+tab1, tab2, tab3, tab4 = st.tabs([
+    f"📊 {selected_ticker} 走势与策略", 
+    "🧩 行业分布与重仓股", 
+    "💰 历史回报与分红", 
+    "⚔️ 三大 ETF 走势对比"
+])
 
-# Tab 1: 价格走势、买入建议与投资计算器
+# Tab 1: 走势与买入建议
 with tab1:
     buy_advice = analyze_buy_signal(hist, latest_price, week_52_high, week_52_low)
     render_advice_card(buy_advice)
@@ -79,7 +100,7 @@ with tab1:
     col_chart, col_calc = st.columns([2.2, 1])
     
     with col_chart:
-        st.markdown('<div class="section-title">📉 历史价格走势曲线</div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="section-title">📉 {selected_ticker} 历史价格走势曲线</div>', unsafe_allow_html=True)
         fig_price = px.line(
             filtered_hist, 
             x=filtered_hist.index, 
@@ -108,7 +129,10 @@ with tab1:
         initial_invest = st.number_input("初始投入 ($)", value=10000, step=1000)
         monthly_invest = st.number_input("每月定投 ($)", value=500, step=100)
         invest_years = st.slider("投资期限 (年)", min_value=1, max_value=30, value=10)
-        expected_return = st.slider("预期年化收益率 (%)", min_value=1.0, max_value=15.0, value=8.5, step=0.5)
+        
+        # 根据不同 ETF 默认合理的预期收益率
+        default_return = 11.0 if selected_ticker == "VGT" else (8.0 if selected_ticker == "SCHD" else 8.5)
+        expected_return = st.slider("预期年化收益率 (%)", min_value=1.0, max_value=20.0, value=default_return, step=0.5)
 
         months = invest_years * 12
         monthly_rate = (1 + expected_return / 100) ** (1/12) - 1
@@ -133,7 +157,7 @@ with tab1:
 with tab2:
     col_sector, col_holdings = st.columns([1, 1.1])
     with col_sector:
-        st.markdown('<div class="section-title">🧱 行业板块分布 (Sector Weight)</div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="section-title">🧱 {selected_ticker} 行业分布</div>', unsafe_allow_html=True)
         fig_pie = px.pie(
             sector_data, 
             values='Weight', 
@@ -153,7 +177,7 @@ with tab2:
         st.plotly_chart(fig_pie, use_container_width=True)
 
     with col_holdings:
-        st.markdown('<div class="section-title">🏆 Top 10 核心重仓股</div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="section-title">🏆 {selected_ticker} Top 10 核心重仓股</div>', unsafe_allow_html=True)
         st.dataframe(
             top_holdings,
             column_config={
@@ -163,7 +187,7 @@ with tab2:
                     "权重占比",
                     format="%.1f%%",
                     min_value=0,
-                    max_value=10
+                    max_value=20
                 )
             },
             hide_index=True,
@@ -237,6 +261,14 @@ with tab3:
             st.plotly_chart(fig_div, use_container_width=True)
         else:
             st.info("暂无分红数据")
+
+# Tab 4: 三大 ETF 收益对比页
+with tab4:
+    try:
+        df_compare = load_all_historical_returns(["VOO", "VGT", "SCHD"])
+        render_comparison_chart(df_compare, theme)
+    except Exception as e:
+        st.error(f"加载对比数据失败: {e}")
 
 # 全局页脚
 st.divider()
