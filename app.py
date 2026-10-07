@@ -259,17 +259,24 @@ with tab3:
         else:
             st.info("暂无分红数据")
 
-# Tab 4: 收益对比页 (联动 time_range)
+# Tab 4: 收益对比页 (精确计算区间累计收益率)
 with tab4:
     try:
-        # 获取三大 ETF 的历史收益数据并按 time_range 筛选
-        df_compare_all = load_all_historical_returns(["VOO", "VGT", "SCHD"])
-        df_compare_filtered = filter_by_range(df_compare_all, time_range) # 👈 动态联动切片
+        # 1. 获取所有标的的原始收盘价
+        df_raw_prices = load_all_historical_returns(["VOO", "VGT", "SCHD"])
         
-        # 重新归一化基准：使筛选起点的第一天收益率重新对齐为 0%
-        if not df_compare_filtered.empty: # type: ignore
-            df_compare_normalized = df_compare_filtered - df_compare_filtered.iloc[0] # type: ignore
-            render_comparison_chart(df_compare_normalized, time_range)
+        # 2. 根据选定的时间跨度进行时间切片
+        df_filtered_prices = filter_by_range(df_raw_prices, time_range)
+        
+        if not df_filtered_prices.empty: # type: ignore
+            # 3. 正确计算区间真实累计收益率 (%)：(当前价格 / 起点价格 - 1) * 100
+            start_prices = df_filtered_prices.iloc[0] # type: ignore
+            df_cumulative_returns = ((df_filtered_prices / start_prices) - 1) * 100
+            
+            # 4. 渲染图表
+            render_comparison_chart(df_cumulative_returns, time_range)
+        else:
+            st.warning("所选时间段内无足够的数据进行对比。")
     except Exception as e:
         st.error(f"加载对比数据失败: {e}")
 

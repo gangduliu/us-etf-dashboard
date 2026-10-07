@@ -94,16 +94,15 @@ def load_etf_holdings_and_sectors(ticker_symbol="VOO"):
 
 @st.cache_data(ttl=3600)
 def load_all_historical_returns(tickers=["VOO", "VGT", "SCHD"]):
-    """获取多标的归一化（以初始 100 基准）走势数据，用于全景对比图"""
+    """获取多标的原始收盘价数据 (不预先进行归一化)"""
     df_combined = pd.DataFrame()
     for t in tickers:
         hist = yf.Ticker(t).history(period="max")
         if not hist.empty:
             hist.index = hist.index.tz_localize(None) # type: ignore
-            close = hist['Close']
-            # 归一化为百分比累计收益率
-            normalized = (close / close.iloc[0] - 1) * 100
-            df_combined[t] = normalized
+            df_combined[t] = hist['Close']
+            
+    # 清理丢失数据并对齐日期
     return df_combined.dropna()
 
 
