@@ -2,40 +2,12 @@ import streamlit as st
 import plotly.express as px
 from datetime import datetime
 
-def get_theme_config(dark_active):
-    """根据主题切换状态返回色彩参数"""
-    if dark_active:
-        return {
-            "THEME_MAIN": "#26B0A1",
-            "THEME_MAIN_LIGHT": "#5EEAD4",
-            "THEME_BG": "#0F172A",
-            "THEME_CARD": "#1E293B",
-            "THEME_TEXT_DARK": "#F8FAFC",
-            "THEME_TEXT_MUTED": "#94A3B8",
-            "THEME_BORDER": "#334155",
-            "PLOTLY_TEMPLATE": "plotly_dark",
-            "CALC_BG": "#132322",
-            "CALC_BORDER": "#14532D",
-            "CALC_TEXT": "#4ADE80"
-        }
-    else:
-        return {
-            "THEME_MAIN": "#0F766E",
-            "THEME_MAIN_LIGHT": "#14B8A6",
-            "THEME_BG": "#F8FAFC",
-            "THEME_CARD": "#FFFFFF",
-            "THEME_TEXT_DARK": "#0F172A",
-            "THEME_TEXT_MUTED": "#64748B",
-            "THEME_BORDER": "#E2E8F0",
-            "PLOTLY_TEMPLATE": "plotly_white",
-            "CALC_BG": "#F0FDF4",
-            "CALC_BORDER": "#BBF7D0",
-            "CALC_TEXT": "#15803D"
-        }
+# 统一锁定主题主色调：青柠绿 / 深青色
+PRIMARY_COLOR = "#0F766E"
+PRIMARY_LIGHT = "#14B8A6"
 
-
-def inject_custom_css(theme):
-    """注入全套 CSS 渲染与卡片对齐样式"""
+def inject_custom_css():
+    """注入适配 Streamlit 原生主题的 CSS 样式，保持 #0F766E 青柠绿主色"""
     st.markdown(f"""
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
@@ -44,29 +16,20 @@ def inject_custom_css(theme):
             font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
         }}
 
-        .stApp {{
-            background-color: {theme['THEME_BG']};
-            color: {theme['THEME_TEXT_DARK']};
-        }}
-        
         .block-container {{
             padding-top: 2rem !important;
             padding-bottom: 2rem !important;
             max-width: 1280px;
         }}
 
-        [data-testid="stSidebar"] {{
-            background-color: {theme['THEME_CARD']};
-            border-right: 1px solid {theme['THEME_BORDER']};
-        }}
-        
+        /* 顶部 Header Banner - 青柠绿渐变 */
         .header-banner {{
-            background: linear-gradient(135deg, #0F766E 0%, #0D9488 100%);
+            background: linear-gradient(135deg, {PRIMARY_COLOR} 0%, #0D9488 100%);
             padding: 24px 32px;
             border-radius: 16px;
-            color: #FFFFFF;
+            color: #FFFFFF !important;
             margin-bottom: 24px;
-            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.2);
+            box-shadow: 0 10px 15px -3px rgba(15, 118, 110, 0.25);
         }}
         .header-banner h1 {{
             color: #FFFFFF !important;
@@ -81,12 +44,12 @@ def inject_custom_css(theme):
             margin: 0;
         }}
 
+        /* KPI 指标卡片 */
         [data-testid="stMetric"] {{
-            background-color: {theme['THEME_CARD']};
+            background-color: rgba(125, 125, 125, 0.05);
             padding: 18px 20px;
             border-radius: 12px;
-            border: 1px solid {theme['THEME_BORDER']};
-            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            border: 1px solid rgba(125, 125, 125, 0.15);
             transition: all 0.2s ease-in-out;
             position: relative;
             overflow: hidden;
@@ -94,7 +57,7 @@ def inject_custom_css(theme):
         }}
         [data-testid="stMetric"]:hover {{
             transform: translateY(-2px);
-            box-shadow: 0 6px 12px -2px rgba(0, 0, 0, 0.15);
+            border-color: rgba(15, 118, 110, 0.4);
         }}
         [data-testid="stMetric"]::before {{
             content: "";
@@ -103,61 +66,53 @@ def inject_custom_css(theme):
             left: 0;
             right: 0;
             height: 3px;
-            background: linear-gradient(90deg, {theme['THEME_MAIN']}, {theme['THEME_MAIN_LIGHT']});
+            background: linear-gradient(90deg, {PRIMARY_COLOR}, {PRIMARY_LIGHT});
         }}
         
         [data-testid="stMetricLabel"] {{
-            color: {theme['THEME_TEXT_MUTED']} !important;
             font-weight: 500 !important;
             font-size: 0.85rem !important;
+            opacity: 0.8;
         }}
         
         [data-testid="stMetricValue"] {{
-            color: {theme['THEME_TEXT_DARK']} !important;
             font-weight: 700 !important;
             font-size: 1.5rem !important;
             letter-spacing: -0.02em;
         }}
 
+        /* 标签页 (Tabs) 主题色激活效果 */
         .stTabs [data-baseweb="tab-list"] {{
             gap: 8px;
-            background-color: {theme['THEME_CARD']};
+            background-color: rgba(125, 125, 125, 0.08);
             padding: 6px;
             border-radius: 10px;
-            border: 1px solid {theme['THEME_BORDER']};
         }}
 
         .stTabs [data-baseweb="tab"] {{
             height: 40px;
             border-radius: 6px;
-            color: {theme['THEME_TEXT_MUTED']};
             font-weight: 600;
             font-size: 0.9rem;
             border: none !important;
         }}
 
         .stTabs [aria-selected="true"] {{
-            background-color: {theme['THEME_MAIN']} !important;
+            background-color: {PRIMARY_COLOR} !important;
             color: #FFFFFF !important;
         }}
         
         .section-title {{
             font-size: 1.1rem;
             font-weight: 700;
-            color: {theme['THEME_TEXT_DARK']};
             margin-bottom: 16px;
-        }}
-
-        hr {{
-            border-color: {theme['THEME_BORDER']};
-            margin: 1.5rem 0;
         }}
     </style>
     """, unsafe_allow_html=True)
 
 
 def render_header(selected_ticker, meta):
-    """渲染支持标的切替的 Header Banner"""
+    """渲染顶部 Header Banner"""
     st.markdown(f"""
     <div class="header-banner">
         <h1>📈 {meta['name']} ({selected_ticker})</h1>
@@ -167,7 +122,7 @@ def render_header(selected_ticker, meta):
 
 
 def render_kpi_cards(latest_price, price_change, pct_change, week_52_high, week_52_low, div_yield, expense_ratio, total_assets):
-    """渲染高度对齐的顶部 5 大核心 KPI 卡片"""
+    """渲染高度统一的顶部 5 大核心 KPI 指标卡片"""
     col1, col2, col3, col4, col5 = st.columns(5)
 
     col1.metric(
@@ -196,14 +151,14 @@ def render_kpi_cards(latest_price, price_change, pct_change, week_52_high, week_
     col5.metric(
         label="资产规模 (AUM)",
         value=f"${total_assets / 1e9:.1f} B" if total_assets else "N/A",
-        delta="跟踪标普500指数",
+        delta="跟踪对应指数",
         delta_color="off"
     )
     st.write("")
 
 
 def render_advice_card(advice):
-    """渲染买入策略建议 Banner"""
+    """渲染量化策略评估卡片"""
     st.markdown(f"""
     <div style="background-color: {advice['badge_bg']}; border-left: 5px solid {advice['badge_color']}; padding: 16px 20px; border-radius: 8px; margin-bottom: 20px;">
         <div style="font-size: 1.1rem; font-weight: 700; color: {advice['badge_color']}; margin-bottom: 6px;">
@@ -220,8 +175,9 @@ def render_advice_card(advice):
     </div>
     """, unsafe_allow_html=True)
 
-def render_comparison_chart(df_compare, theme):
-    """渲染 VOO vs VGT vs SCHD 10年累计收益率对比图"""
+
+def render_comparison_chart(df_compare):
+    """渲染三标的收益对比折线图，调配色系"""
     st.markdown('<div class="section-title">⚔️ VOO / VGT / SCHD 近 10 年累计收益率比拼 (%)</div>', unsafe_allow_html=True)
     
     fig = px.line(
@@ -229,7 +185,8 @@ def render_comparison_chart(df_compare, theme):
         x=df_compare.index, 
         y=df_compare.columns,
         labels={'value': '累计收益率 (%)', 'Date': '日期', 'variable': '标的'},
-        template=theme['PLOTLY_TEMPLATE']
+        template="plotly",
+        color_discrete_sequence=['#0F766E', '#2DD4BF', '#0284C7'] # VOO, VGT, SCHD 区分调色
     )
     fig.update_traces(line_width=2.5)
     fig.update_layout(
@@ -239,6 +196,6 @@ def render_comparison_chart(df_compare, theme):
         paper_bgcolor='rgba(0,0,0,0)',
         plot_bgcolor='rgba(0,0,0,0)',
         xaxis=dict(showgrid=False),
-        yaxis=dict(showgrid=True, gridcolor=theme['THEME_BORDER'], title="累计收益率 (%)")
+        yaxis=dict(showgrid=True, title="累计收益率 (%)")
     )
     st.plotly_chart(fig, use_container_width=True)

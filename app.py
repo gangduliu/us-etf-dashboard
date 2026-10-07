@@ -17,8 +17,8 @@ from data import (
 )
 from strategy import analyze_buy_signal
 from ui import (
-    get_theme_config, inject_custom_css, render_header, 
-    render_kpi_cards, render_advice_card, render_comparison_chart
+    inject_custom_css, render_header, render_kpi_cards,
+    render_advice_card, render_comparison_chart
 )
 
 # 1. 页面基本配置
@@ -30,9 +30,6 @@ st.set_page_config(
 )
 
 # 2. 侧边栏：标的选择器与参数配置
-if "dark_mode" not in st.session_state:
-    st.session_state.dark_mode = False
-
 with st.sidebar:
     st.markdown("### 🎯 标的选择")
     selected_ticker = st.selectbox(
@@ -43,17 +40,14 @@ with st.sidebar:
     
     st.divider()
     st.markdown("### ⚙️ 看板配置")
-    st.session_state.dark_mode = st.toggle("🌙 深色模式 (Dark Mode)", value=st.session_state.dark_mode)
-    
     time_range = st.selectbox(
         "时间跨度筛选",
         options=["1Y", "3Y", "5Y", "10Y", "Max"],
         index=3
     )
 
-# 3. 主题与数据加载
-theme = get_theme_config(st.session_state.dark_mode)
-inject_custom_css(theme)
+# 3. 注入CSS与数据加载
+inject_custom_css()
 meta = ETF_METADATA[selected_ticker]
 
 try:
@@ -106,10 +100,10 @@ with tab1:
             x=filtered_hist.index, 
             y='Close',
             labels={'Close': '收盘价 (USD)', 'Date': '日期'},
-            template=theme['PLOTLY_TEMPLATE']
+            template="plotly"
         )
         fig_price.update_traces(
-            line_color=theme['THEME_MAIN'], 
+            line_color="#0F766E", 
             line_width=2.5,
             hovertemplate="日期: %{x|%Y-%m-%d}<br>价格: <b>$%{y:.2f}</b><extra></extra>"
         )
@@ -120,7 +114,7 @@ with tab1:
             paper_bgcolor='rgba(0,0,0,0)',
             plot_bgcolor='rgba(0,0,0,0)',
             xaxis=dict(showgrid=False),
-            yaxis=dict(showgrid=True, gridcolor=theme['THEME_BORDER'], title="")
+            yaxis=dict(showgrid=True, title="")
         )
         st.plotly_chart(fig_price, use_container_width=True)
 
@@ -130,7 +124,6 @@ with tab1:
         monthly_invest = st.number_input("每月定投 ($)", value=500, step=100)
         invest_years = st.slider("投资期限 (年)", min_value=1, max_value=30, value=10)
         
-        # 根据不同 ETF 默认合理的预期收益率
         default_return = 11.0 if selected_ticker == "VGT" else (8.0 if selected_ticker == "SCHD" else 8.5)
         expected_return = st.slider("预期年化收益率 (%)", min_value=1.0, max_value=20.0, value=default_return, step=0.5)
 
@@ -143,10 +136,10 @@ with tab1:
         profit = total_balance - total_principal
 
         st.markdown(f"""
-        <div style="background-color: {theme['CALC_BG']}; border: 1px solid {theme['CALC_BORDER']}; padding: 16px; border-radius: 10px; margin-top: 10px;">
-            <div style="font-size: 0.85rem; color: {theme['CALC_TEXT']}; font-weight: 500;">预估期末资产 ({invest_years}年后)</div>
-            <div style="font-size: 1.8rem; font-weight: 700; color: {theme['CALC_TEXT']}; margin: 4px 0;">${total_balance:,.0f}</div>
-            <div style="font-size: 0.85rem; color: {theme['THEME_TEXT_MUTED']};">
+        <div style="background-color: rgba(15, 118, 110, 0.1); border: 1px solid rgba(15, 118, 110, 0.3); padding: 16px; border-radius: 10px; margin-top: 10px;">
+            <div style="font-size: 0.85rem; color: #0F766E; font-weight: 600;">预估期末资产 ({invest_years}年后)</div>
+            <div style="font-size: 1.8rem; font-weight: 700; color: #0F766E; margin: 4px 0;">${total_balance:,.0f}</div>
+            <div style="font-size: 0.85rem; opacity: 0.85;">
                 累计本金: <b>${total_principal:,.0f}</b><br>
                 预计纯收益: <b>${profit:,.0f}</b> (+{(profit/total_principal)*100:.1f}%)
             </div>
@@ -163,7 +156,7 @@ with tab2:
             values='Weight', 
             names='Sector', 
             hole=0.5,
-            template=theme['PLOTLY_TEMPLATE'],
+            template="plotly",
             color_discrete_sequence=['#0F766E', '#0D9488', '#14B8A6', '#2DD4BF', '#5EEAD4', '#99F6E4', '#CCFBF1', '#334155']
         )
         fig_pie.update_traces(textposition='inside', textinfo='percent+label')
@@ -206,14 +199,14 @@ with tab3:
             "Year": annual_returns.index.year, # type: ignore
             "Return": annual_returns.values
         }).tail(10)
-        annual_df['Color'] = annual_df['Return'].apply(lambda x: theme['THEME_MAIN'] if x >= 0 else '#F43F5E')
+        annual_df['Color'] = annual_df['Return'].apply(lambda x: '#0F766E' if x >= 0 else '#F43F5E')
         
         fig_bar = px.bar(
             annual_df, 
             x='Year', 
             y='Return', 
             text_auto='.1f', # type: ignore
-            template=theme['PLOTLY_TEMPLATE']
+            template="plotly"
         )
         fig_bar.update_traces(marker_color=annual_df['Color'], textposition='outside')
         fig_bar.update_layout(
@@ -224,7 +217,7 @@ with tab3:
             paper_bgcolor='rgba(0,0,0,0)',
             plot_bgcolor='rgba(0,0,0,0)',
             xaxis=dict(showgrid=False, dtick=1),
-            yaxis=dict(showgrid=True, gridcolor=theme['THEME_BORDER'])
+            yaxis=dict(showgrid=True)
         )
         st.plotly_chart(fig_bar, use_container_width=True)
 
@@ -240,11 +233,11 @@ with tab3:
                 x='Year', 
                 y='Dividends', 
                 markers=True,
-                template=theme['PLOTLY_TEMPLATE']
+                template="plotly"
             )
             fig_div.update_traces(
-                line_color=theme['THEME_MAIN'], 
-                marker_color=theme['THEME_MAIN_LIGHT'], 
+                line_color="#0F766E", 
+                marker_color="#14B8A6", 
                 marker_size=8,
                 hovertemplate="年份: %{x}<br>每股分红: <b>$%{y:.2f}</b><extra></extra>"
             )
@@ -256,20 +249,20 @@ with tab3:
                 paper_bgcolor='rgba(0,0,0,0)',
                 plot_bgcolor='rgba(0,0,0,0)',
                 xaxis=dict(showgrid=False, dtick=1),
-                yaxis=dict(showgrid=True, gridcolor=theme['THEME_BORDER'])
+                yaxis=dict(showgrid=True)
             )
             st.plotly_chart(fig_div, use_container_width=True)
         else:
             st.info("暂无分红数据")
 
-# Tab 4: 三大 ETF 收益对比页
+# Tab 4: 收益对比页
 with tab4:
     try:
         df_compare = load_all_historical_returns(["VOO", "VGT", "SCHD"])
-        render_comparison_chart(df_compare, theme)
+        render_comparison_chart(df_compare)
     except Exception as e:
         st.error(f"加载对比数据失败: {e}")
 
-# 全局页脚
+# 页脚
 st.divider()
-st.caption("💡 声明：本看板仅供个人数据展示与学术研究，不构成任何投资建议。数据源自 Yahoo Finance。")
+st.caption("💡 声明：本看板仅供个人数据展示与学术研究，不构成任何投资建议。数据源自 Yahoo Finance。用户可在右上角 Settings 菜单中自由切换 Light / Dark 主题。")
