@@ -22,6 +22,7 @@ ETF_METADATA = {
     }
 }
 
+
 @st.cache_data(ttl=3600)
 def load_etf_data(ticker_symbol="VOO"):
     """通用获取 ETF 历史价格、info 字典以及分红数据"""
@@ -131,3 +132,24 @@ def calculate_ttm_dividend_yield(dividends, latest_price, info):
             
     raw_yield = info.get('dividendYield', 0.015)
     return raw_yield * 100 if raw_yield < 0.2 else raw_yield
+
+
+def get_etf_aum(info, ticker_symbol):
+    """
+    稳健提取或计算 ETF 资产规模 (AUM)
+    解决 Streamlit Cloud 服务器上 yfinance info 返回 None 的问题
+    """
+    # 1. 尝试从多个 Yahoo Finance info 字段中获取
+    aum = info.get('totalAssets') or info.get('marketCap') or info.get('netAssets')
+    
+    if isinstance(aum, (int, float)) and aum > 0:
+        return aum
+        
+    # 2. 如果云端 API 未能获取到 AUM，使用官方静态估算基准数据兜底 (单位: 美元)
+    known_aums = {
+        "VOO": 520_000_000_000,  # ~5200 亿美金
+        "VGT": 75_000_000_000,   # ~750 亿美金
+        "SCHD": 58_000_000_000   # ~580 亿美金
+    }
+    
+    return known_aums.get(ticker_symbol, 0)

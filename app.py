@@ -13,7 +13,8 @@ from datetime import datetime
 # 导入自定义模块
 from data import (
     ETF_METADATA, load_etf_data, load_etf_holdings_and_sectors, 
-    load_all_historical_returns, filter_by_range, calculate_ttm_dividend_yield
+    load_all_historical_returns, filter_by_range, calculate_ttm_dividend_yield,
+    get_etf_aum
 )
 from strategy import analyze_buy_signal
 from ui import (
@@ -72,7 +73,7 @@ div_yield = calculate_ttm_dividend_yield(dividends, latest_price, info)
 expense_ratio = info.get('expenseRatio', 0.03 if selected_ticker=="VOO" else (0.10 if selected_ticker=="VGT" else 0.06))
 if isinstance(expense_ratio, (int, float)) and expense_ratio < 0.01:
     expense_ratio = expense_ratio * 100
-total_assets = info.get('totalAssets', 0)
+total_assets = get_etf_aum(info, selected_ticker)
 
 # 4. 渲染 Banner & KPI 卡片
 render_header(selected_ticker, meta)
