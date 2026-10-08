@@ -118,3 +118,63 @@ def calculate_portfolio_metrics(portfolio_df, market_data):
         "daily_gain_loss": daily_gain_loss,
         "details_df": pd.DataFrame(detailed_rows)
     }
+
+
+def analyze_portfolio_health(portfolio_df, market_data, sector_p_df):
+    """
+    对投资组合进行健康诊断，提供分散度警告、行业集中度风险与再平衡建议
+    """
+    suggestions = []
+    
+    # 1. 计算各持仓标的的当前市值与权重占比
+    total_val = 0.0
+    pos_weights = {}
+    
+    for _, row in portfolio_df.iterrows():
+        t = row['ticker']
+        shares = row['shares']
+        price = market_data.get(t, {}).get('latest_price', row['cost_price'])
+        v = shares * price
+        total_val += v
+        pos_weights[t] = v
+
+    if total_val == 0:
+        return suggestions
+
+    # 计算百分比占比
+    pos_pcts = {t: (v / total_val * 100) for t, v in pos_weights.items()}
+
+    # 2. 诊断一：单一标的集中度风险
+    for t, pct in pos_pcts.items():
+        if pct > 40.0:
+            suggestions.append({
+                "level": "WARNING",
+                "title": f"⚠️ 标的集中度风险: {t} 占比高达 {pct:.1f}%",
+                "desc": f"单个标的 {t} 占总资产比例超过 40%，组合价格波动受该标的单边影响较大。建议新增资金优先分配至其他低估标的，或适度止盈以降低集中度。"
+            })
+
+    # 3. 诊断二：行业集中度暴露
+    if not sector_p_df.empty:
+        top_sector = sector_p_df.iloc[0]
+        if top_sector['Weight'] > 50.0:
+            suggestions.append({
+                "level": "WARNING",
+                "title": f"⚠️ 行业过度集中: {top_sector['Sector']} 行业占比达 {top_sector['Weight']:.1f}%",
+                "desc": f"组合在 **{top_sector['Sector']}** 行业的穿透配置过半，若该行业面临系统性回调（如科技股大幅挤估值），组合回撤压力会显著增加。建议补充非相关性资产（如高股息 SCHD 或防守型资产）。"
+            })
+
+    # 4. 诊断三：组合分散度与再平衡状态
+    if len(pos_pcts) == 1:
+        suggestions.append({
+            "level": "INFO",
+            "title": "💡 组合单一度提示",
+            "desc": "当前组合仅包含 1 只标的。若为 VOO 等宽基指数 ETF 可长期持有；若是单一个股，建议引入其他资产以降低个股特有风险。"
+        })
+    elif len(suggestions) == 0:
+        suggestions.append({
+            "level": "SUCCESS",
+            "title": "🟢 组合健康度良好 / 配置均衡",
+            "desc": "持仓标的与行业分布较为健康，未出现极端的单一集中度风险。建议继续保持按既定频率（如半年或一年）进行常态化再平衡。"
+        })
+
+    return suggestions

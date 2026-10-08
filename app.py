@@ -16,11 +16,11 @@ from data import (
     get_asset_size_or_market_cap, get_range_years_limit,
     load_portfolio_market_data, get_portfolio_sector_breakdown
 )
-from strategy import analyze_trading_signal, calculate_portfolio_metrics
+from strategy import analyze_trading_signal, calculate_portfolio_metrics, analyze_portfolio_health
 from ui import (
     inject_custom_css, render_header, render_kpi_cards, 
     render_advice_card, render_comparison_chart,
-    render_portfolio_summary_cards, render_portfolio_charts
+    render_portfolio_summary_cards, render_portfolio_charts, render_portfolio_advisory
 )
 
 # 1. 页面基本配置
@@ -346,7 +346,12 @@ with tab5:
         # 5. 中层图表分析（宽屏并排+外置图例，解决文字重叠）
         render_portfolio_charts(p_metrics, sector_p_df)
         
-        st.markdown("<br>", unsafe_allow_html=True)
+        if not valid_portfolio.empty:
+            # 新增：运行投资组合健康诊断
+            suggestions = analyze_portfolio_health(valid_portfolio, market_data, sector_p_df)
+            render_portfolio_advisory(suggestions)
+        
+            st.markdown("<br>", unsafe_allow_html=True)
         
         # 6. 底层持仓盈亏明细表格（全宽舒展展示）
         st.markdown('<div class="section-title">📋 持仓资产盈亏明细表</div>', unsafe_allow_html=True)
