@@ -1,67 +1,140 @@
+import numpy as np
 import pandas as pd
 from datetime import datetime, timedelta
 
-def analyze_trading_signal(hist, latest_price, week_52_high, week_52_low, div_yield):
+
+def calculate_rsi(prices, period=14):
+    """计算 RSI 指标"""
+    delta = prices.diff()
+    gain = (delta.where(delta > 0, 0)).rolling(window=period).mean()
+    loss = (-delta.where(delta < 0, 0)).rolling(window=period).mean()
+    rs = gain / loss
+    rsi = 100 - (100 / (1 + rs))
+    return rsi.iloc[-1] if not rsi.empty and not np.isnan(rsi.iloc[-1]) else 50.0
+
+
+def analyze_trading_signal(hist, latest_price, week_52_high, week_52_low, div_yield, ticker_symbol=""):
     """
-    根据 MA200 均线、52 周相对高低位、RSI 指标及偏离度计算综合买卖/再平衡建议
+    机构级多因子量化交易信号模型 (Multi-Factor Score)
+    综合考量：MA200乖离率、MA20/50均线趋势、RSI超买超卖、52周位置及布林带%B
     """
-    # 1. 计算 200 日均线 (MA200)
-    ma200 = hist['Close'].tail(200).mean() if len(hist) >= 200 else hist['Close'].mean()
+    if hist.empty or len(hist) < 20:
+        return {
+            "type": "HOLD",
+            "title": "🔵 数据不足 / 保持观察",
+            "desc": "暂无足够历史数据计算量化信号。",
+            "ma200": latest_price, "position_52w": 50.0, "ma_bias": 0.0, "rsi": 50.0,
+            "badge_color": "#1E40AF", "badge_bg": "#DBEAFE", "score": 0
+        }
+
+    close_series = hist['Close']
+
+    # 1. 计算核心量化指标
+    ma20 = close_series.tail(20).mean()
+    ma50 = close_series.tail(50).mean() if len(close_series) >= 50 else ma20
+    ma200 = close_series.tail(200).mean() if len(close_series) >= 200 else close_series.mean()
     
-    # 2. 计算 52 周分位数 (0% ~ 100%)
+    # 乖离率 (%)
+    ma200_bias = ((latest_price - ma200) / ma200) * 100
+    ma50_bias = ((latest_price - ma50) / ma50) * 100
+    
+    # 52周相对分位数
     range_52 = week_52_high - week_52_low
-    position_52w = ((latest_price - week_52_low) / range_52 * 100) if range_52 > 0 else 50
-    
-    # 3. 计算 MA200 乖离率 (%)
-    ma_bias = ((latest_price - ma200) / ma200) * 100
-    
-    # 4. 计算简易 RSI (14日)
-    delta = hist['Close'].diff()
-    gain = (delta.where(delta > 0, 0)).tail(14).mean()
-    loss = (-delta.where(delta < 0, 0)).tail(14).mean()
-    rsi = 100 - (100 / (1 + gain / loss)) if loss != 0 else 50
+    position_52w = ((latest_price - week_52_low) / range_52 * 100) if range_52 > 0 else 50.0
 
-    # 5. 综合决策逻辑（包含卖出/止盈/买入/持有信号）
-    if ma_bias > 18 or (position_52w > 95 and rsi > 75):
-        # 🚨 强卖出 / 减仓 / 止盈信号
-        signal_type = "SELL_STRONG"
-        signal_title = "🔴 短期严重过热 / 建议分批止盈或再平衡 (Sell/Reduce)"
-        signal_desc = f"当前价格偏离 200 日均线高达 {ma_bias:+.1f}%，且 RSI({rsi:.1f}) 进入超买区。短期回调风险极高，建议对盈利较丰厚的部分仓位**分批止盈**，或通过资产再平衡（Rebalance）将资金转移至低估标的。"
-        badge_color = "#991B1B" # 警示红
-        badge_bg = "#FEE2E2"
+    # RSI(14)
+    rsi = calculate_rsi(close_series, 14)
 
-    elif ma_bias > 12 or position_52w > 88:
-        # ⚠️ 减仓提示 / 暂停加仓
-        signal_type = "SELL_WEAK"
-        signal_title = "🟡 处于相对高位 / 建议暂停追高或适度减仓 (Hold/Trim)"
-        signal_desc = f"价格接近 52 周高点（分位数 {position_52w:.1f}%），上方获利盘回吐压力增大。不建议此时大额追高，偏好稳健的投资者可考虑**小幅减仓锁定部分收益**。"
-        badge_color = "#9A3412" # 橙黄
-        badge_bg = "#FFEDD5"
+    # 布林带 (20, 2) 与 %B 指标
+    std20 = close_series.tail(20).std()
+    upper_band = ma20 + (2 * std20)
+    lower_band = ma20 - (2 * std20)
+    pct_b = ((latest_price - lower_band) / (upper_band - lower_band)) if (upper_band - lower_band) > 0 else 0.5
 
-    elif latest_price < ma200:
-        # 🟢 买入信号
-        signal_type = "BUY"
-        signal_title = "🟢 具备较高性价比 / 黄金加仓期 (Buy)"
-        signal_desc = f"当前价格已低于 200 日均线 (${ma200:.2f})，处于中长期价值区间。对于长期投资者而言，具备较好的**分批建仓/大额加仓**性价比。"
-        badge_color = "#166534" # 绿
+    # 2. 多因子打分逻辑 (Score range: -100 ~ +100)
+    # 正分偏买入 (低估/支撑)，负分偏卖出/止盈 (过热/压力)
+    score = 0
+
+    # 因子 A: MA200 乖离率 (-30 ~ +30 分)
+    if ma200_bias < -10:
+        score += 30  # 深度回调，强超买机会
+    elif ma200_bias < -3:
+        score += 15  # 均线下方，具备性价比
+    elif ma200_bias > 20:
+        score -= 30  # 严重偏离均线，极度过热
+    elif ma200_bias > 12:
+        score -= 15  # 乖离率偏高
+
+    # 因子 B: RSI 超买超卖 (-25 ~ +25 分)
+    if rsi < 30:
+        score += 25  # RSI 严重超卖
+    elif rsi < 42:
+        score += 12  # RSI 弱势区
+    elif rsi > 75:
+        score -= 25  # RSI 严重超买
+    elif rsi > 65:
+        score -= 12  # RSI 进入强势高位
+
+    # 因子 C: 布林带 %B 位置 (-20 ~ +20 分)
+    if pct_b < 0.05:
+        score += 20  # 触及/跌破布林下轨
+    elif pct_b > 0.95:
+        score -= 20  # 突破布林上轨
+
+    # 因子 D: 均线排列趋势确认 (-15 ~ +15 分)
+    if ma20 > ma50 and ma50 > ma200:
+        # 多头排列：强趋势中提高对超买的容忍度 (+10 动量加分)
+        score += 10
+    elif ma20 < ma50 and ma50 < ma200:
+        # 空头排列：顺势看空 (-10 分)
+        score -= 10
+
+    # 3. 结果决策映射
+    if score >= 35:
+        signal_type = "BUY_STRONG"
+        signal_title = f"🟢 强买入 / 黄金加仓期 (综合评分: +{score})"
+        signal_desc = f"价格跌破或贴近关键支撑区（MA200 乖离率 {ma200_bias:+.1f}%，RSI 为 {rsi:.1f}），布林带逼近下轨。历史概率显示当前具备极高风险收益比，建议分批加仓或分批建仓。"
+        badge_color = "#166534"
         badge_bg = "#DCFCE7"
 
+    elif score >= 10:
+        signal_type = "BUY_WEAK"
+        signal_title = f"🟢 分批定投 / 逢低适度关注 (综合评分: +{score})"
+        signal_desc = f"指标整体处于合理或偏低估区间（RSI {rsi:.1f}），估值并未过热。适合常态化定投或分批小额买入。"
+        badge_color = "#15803D"
+        badge_bg = "#F0FDF4"
+
+    elif score <= -35:
+        signal_type = "SELL_STRONG"
+        signal_title = f"🔴 强减仓 / 分批止盈提示 (综合评分: {score})"
+        signal_desc = f"价格显著偏离 200 日均线（乖离率 {ma200_bias:+.1f}%），且 RSI ({rsi:.1f}) 处于极端超买区，触及布林上轨。短期回调风险剧增，建议分批锁定利润或通过资产再平衡降低仓位。"
+        badge_color = "#991B1B"
+        badge_bg = "#FEE2E2"
+
+    elif score <= -10:
+        signal_type = "SELL_WEAK"
+        signal_title = f"🟡 阶段高位 / 暂停追高 (综合评分: {score})"
+        signal_desc = f"价格接近 52 周高点（分位数 {position_52w:.1f}%），乖离率放宽。不建议此时大额追高，偏好稳健的投资者可暂停加仓或小幅再平衡。"
+        badge_color = "#9A3412"
+        badge_bg = "#FFEDD5"
+
     else:
-        # 🔵 常规持有 / 定投
         signal_type = "HOLD"
-        signal_title = "🔵 趋势健康 / 适合常态化持有与定投 (Hold/DCA)"
-        signal_desc = f"价格保持在 200 日均线 (${ma200:.2f}) 之上运行（乖离率 {ma_bias:+.1f}%），整体上升趋势健全。适合按既定计划**继续持有或正常定投**。"
-        badge_color = "#1E40AF" # 蓝
+        signal_title = f"🔵 趋势健康 / 正常持有 (综合评分: {score:+} )"
+        signal_desc = f"价格在 200 日均线 (${ma200:.2f}) 上方平稳运行（乖离率 {ma200_bias:+.1f}%），各项指标处于均衡区间。建议保持既定投资策略，正常持有。"
+        badge_color = "#1E40AF"
         badge_bg = "#DBEAFE"
-        
+
     return {
         "type": signal_type,
         "title": signal_title,
         "desc": signal_desc,
+        "score": score,
         "ma200": ma200,
         "position_52w": position_52w,
-        "ma_bias": ma_bias,
+        "ma_bias": ma200_bias,
         "rsi": rsi,
+        "pct_b": pct_b * 100,
         "badge_color": badge_color,
         "badge_bg": badge_bg
     }
