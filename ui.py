@@ -335,33 +335,38 @@ def render_portfolio_charts(p_metrics, sector_p_df):
 
 
 def render_portfolio_advisory(suggestions):
-    """渲染投资组合量化管理与诊断建议 (支持 DANGER 高危级别)"""
+    """渲染投资组合健康诊断与建议 (完美兼容 Dark Mode / Light Mode 高对比度)"""
     st.markdown('<div class="section-title">💡 投资组合健康诊断与优化建议 (风格区分版)</div>', unsafe_allow_html=True)
     
     for item in suggestions:
         if item['level'] == "DANGER":
-            bg_color = "rgba(220, 38, 38, 0.12)"
-            border_color = "#DC2626"
-            text_color = "#991B1B"
+            # 红色高危卡片
+            border_color = "#EF4444"
+            bg_color = "rgba(239, 68, 68, 0.15)"
+            title_color = "#F87171"
         elif item['level'] == "WARNING":
-            bg_color = "rgba(217, 119, 6, 0.12)"
-            border_color = "#D97706"
-            text_color = "#92400E"
+            # 黄/橙色预警卡片
+            border_color = "#F59E0B"
+            bg_color = "rgba(245, 158, 11, 0.15)"
+            title_color = "#FBBF24"
         elif item['level'] == "SUCCESS":
-            bg_color = "rgba(15, 118, 110, 0.12)"
-            border_color = "#0F766E"
-            text_color = "#0F766E"
+            # 绿色健康卡片
+            border_color = "#10B981"
+            bg_color = "rgba(16, 185, 129, 0.15)"
+            title_color = "#34D399"
         else: # INFO
-            bg_color = "rgba(37, 99, 235, 0.12)"
-            border_color = "#2563EB"
-            text_color = "#1E40AF"
+            # 蓝色信息卡片
+            border_color = "#3B82F6"
+            bg_color = "rgba(59, 130, 246, 0.15)"
+            title_color = "#60A5FA"
 
+        # 使用 CSS 变量 var(--text-color) 确保描述文本在亮色/暗色模式下均拥有最高清晰度与对比度
         st.markdown(f"""
-        <div style="background-color: {bg_color}; border-left: 5px solid {border_color}; padding: 14px 18px; border-radius: 8px; margin-bottom: 12px;">
-            <div style="font-size: 0.95rem; font-weight: 700; color: {text_color}; margin-bottom: 4px;">
+        <div style="background-color: {bg_color}; border-left: 5px solid {border_color}; padding: 14px 18px; border-radius: 8px; margin-bottom: 12px; backdrop-filter: blur(4px);">
+            <div style="font-size: 0.95rem; font-weight: 700; color: {title_color}; margin-bottom: 6px;">
                 {item['title']}
             </div>
-            <div style="font-size: 0.88rem; opacity: 0.92; line-height: 1.5; color: #1E293B;">
+            <div style="font-size: 0.88rem; line-height: 1.55; color: var(--text-color); opacity: 0.95;">
                 {item['desc']}
             </div>
         </div>
