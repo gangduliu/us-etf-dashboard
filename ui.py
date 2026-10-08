@@ -158,7 +158,7 @@ def render_kpi_cards(latest_price, price_change, pct_change, week_52_high, week_
 
 
 def render_advice_card(advice):
-    """渲染量化策略评估卡片"""
+    """渲染买卖策略决策 Banner"""
     st.markdown(f"""
     <div style="background-color: {advice['badge_bg']}; border-left: 5px solid {advice['badge_color']}; padding: 16px 20px; border-radius: 8px; margin-bottom: 20px;">
         <div style="font-size: 1.1rem; font-weight: 700; color: {advice['badge_color']}; margin-bottom: 6px;">
@@ -167,9 +167,10 @@ def render_advice_card(advice):
         <div style="font-size: 0.9rem; color: #334155; line-height: 1.5;">
             {advice['desc']}
         </div>
-        <div style="margin-top: 10px; font-size: 0.82rem; color: #64748B; display: flex; gap: 20px;">
+        <div style="margin-top: 10px; font-size: 0.82rem; color: #64748B; display: flex; flex-wrap: wrap; gap: 20px;">
             <span>200日均线 (MA200): <b>${advice['ma200']:.2f}</b></span>
             <span>MA200 乖离率: <b>{advice['ma_bias']:+.1f}%</b></span>
+            <span>RSI(14): <b>{advice['rsi']:.1f}</b></span>
             <span>52周相对分位数: <b>{advice['position_52w']:.1f}%</b></span>
         </div>
     </div>
@@ -179,7 +180,7 @@ def render_advice_card(advice):
 def render_comparison_chart(df_compare, time_range):
     """渲染 VOO / VGT / SCHD 多标的收益率对比折线图 (响应时间跨度)"""
     title_text = "全历史" if time_range == "Max" else f"近 {time_range}"
-    st.markdown(f'<div class="section-title">⚔️ VOO / VGT / SCHD {title_text}累计收益率比拼 (%)</div>', unsafe_allow_html=True)
+    st.markdown(f'<div class="section-title">⚔️ VOO / VGT / SCHD {title_text} 累计收益率比拼 (%)</div>', unsafe_allow_html=True)
     
     fig = px.line(
         df_compare, 

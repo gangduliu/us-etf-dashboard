@@ -15,7 +15,7 @@ from data import (
     load_all_historical_returns, filter_by_range, calculate_ttm_dividend_yield,
     get_etf_aum, get_range_years_limit
 )
-from strategy import analyze_buy_signal
+from strategy import analyze_trading_signal
 from ui import (
     inject_custom_css, render_header, render_kpi_cards,
     render_advice_card, render_comparison_chart
@@ -86,9 +86,9 @@ tab1, tab2, tab3, tab4 = st.tabs([
     "⚔️ 三大 ETF 走势对比"
 ])
 
-# Tab 1: 走势与买入建议
+# Tab 1: 走势与交易建议
 with tab1:
-    buy_advice = analyze_buy_signal(hist, latest_price, week_52_high, week_52_low)
+    buy_advice = analyze_trading_signal(hist, latest_price, week_52_high, week_52_low, div_yield)
     render_advice_card(buy_advice)
 
     col_chart, col_calc = st.columns([2.2, 1])
