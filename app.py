@@ -11,32 +11,48 @@ import plotly.express as px
 
 # 导入自定义模块
 from data import (
-    ETF_METADATA, load_etf_data, load_etf_holdings_and_sectors, 
+    load_stock_or_etf_data, load_etf_holdings_and_sectors, 
     load_all_historical_returns, filter_by_range, calculate_ttm_dividend_yield,
-    get_etf_aum, get_range_years_limit
+    get_asset_size_or_market_cap, get_range_years_limit
 )
 from strategy import analyze_trading_signal
 from ui import (
-    inject_custom_css, render_header, render_kpi_cards,
+    inject_custom_css, render_header, render_kpi_cards, 
     render_advice_card, render_comparison_chart
 )
 
 # 1. 页面基本配置
 st.set_page_config(
-    page_title="US ETF Dashboard",
+    page_title="US Stock & ETF Dashboard",
     page_icon="📈",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
-# 2. 侧边栏：标的选择器与参数配置
+# 2. 侧边栏：自由搜索美股代码 + 热门快捷切换
 with st.sidebar:
-    st.markdown("### 🎯 标的选择")
-    selected_ticker = st.selectbox(
-        "选择要查看的 ETF",
-        options=["VOO", "VGT", "SCHD"],
-        index=0
-    )
+    st.markdown("### 🔍 查询美股 / ETF")
+    
+    # 初始化输入框状态 (默认 VOO)
+    if "ticker_input" not in st.session_state:
+        st.session_state.ticker_input = "VOO"
+        
+    # 3 个核心 ETF 快捷按钮
+    st.caption("热门快捷标的：")
+    col_quick1, col_quick2, col_quick3 = st.columns(3)
+    
+    if col_quick1.button("VOO", use_container_width=True):
+        st.session_state.ticker_input = "VOO"
+    if col_quick2.button("VGT", use_container_width=True):
+        st.session_state.ticker_input = "VGT"
+    if col_quick3.button("SCHD", use_container_width=True):
+        st.session_state.ticker_input = "SCHD"
+        
+    # 代码文本输入框 (自动绑定快捷按钮的选择)
+    user_ticker = st.text_input(
+        "输入任意美股/ETF代码 (如: TSLA, MSFT, BRK-B)",
+        value=st.session_state.ticker_input
+    ).strip().upper()
     
     st.divider()
     st.markdown("### ⚙️ 看板配置")
@@ -46,55 +62,54 @@ with st.sidebar:
         index=3
     )
 
-# 3. 注入CSS与数据加载
+# 3. 注入 CSS 与通用数据加载
 inject_custom_css()
-meta = ETF_METADATA[selected_ticker]
+
+if not user_ticker:
+    st.warning("请输入有效的美股或 ETF 代码。")
+    st.stop()
 
 try:
-    hist, info, dividends = load_etf_data(selected_ticker)
-    sector_data, top_holdings = load_etf_holdings_and_sectors(selected_ticker)
+    hist, info, dividends, is_etf = load_stock_or_etf_data(user_ticker)
 except Exception as e:
-    st.error(f"获取 {selected_ticker} 数据失败，请检查网络设置: {e}")
+    st.error(f"❌ 数据加载失败: {e}")
     st.stop()
 
 filtered_hist = filter_by_range(hist, time_range)
 
-# 计算核心指标
+# 计算通用核心指标
 latest_price = hist['Close'].iloc[-1]
-prev_price = hist['Close'].iloc[-2]
+prev_price = hist['Close'].iloc[-2] if len(hist) > 1 else latest_price
 price_change = latest_price - prev_price
-pct_change = (price_change / prev_price) * 100
+pct_change = (price_change / prev_price) * 100 if prev_price > 0 else 0
 
 week_52_high = info.get('fiftyTwoWeekHigh', hist['Close'].tail(252).max())
 week_52_low = info.get('fiftyTwoWeekLow', hist['Close'].tail(252).min())
 div_yield = calculate_ttm_dividend_yield(dividends, latest_price, info)
-# 获取费率 (VGT 0.10%, VOO 0.03%, SCHD 0.06%)
-expense_ratio = info.get('expenseRatio', 0.03 if selected_ticker=="VOO" else (0.10 if selected_ticker=="VGT" else 0.06))
-if isinstance(expense_ratio, (int, float)) and expense_ratio < 0.01:
-    expense_ratio = expense_ratio * 100
-total_assets = get_etf_aum(info, selected_ticker)
+size_val = get_asset_size_or_market_cap(info)
 
-# 4. 渲染 Banner & KPI 卡片
-render_header(selected_ticker, meta)
-render_kpi_cards(latest_price, price_change, pct_change, week_52_high, week_52_low, div_yield, expense_ratio, total_assets)
+# 4. 渲染 Banner & 动态 KPI 卡片
+render_header(user_ticker, info, is_etf)
+render_kpi_cards(latest_price, price_change, pct_change, week_52_high, week_52_low, div_yield, info, is_etf, size_val)
 
-# 5. 渲染 Tabs（新增对比页）
+# 5. 动态 Tab 命名
+tab2_title = "🧩 行业分布与重仓股" if is_etf else "🏢 核心财务与公司概况"
 tab1, tab2, tab3, tab4 = st.tabs([
-    f"📊 {selected_ticker} 走势与策略", 
-    "🧩 行业分布与重仓股", 
+    f"📊 {user_ticker} 走势与策略", 
+    tab2_title, 
     "💰 历史回报与分红", 
-    "⚔️ 三大 ETF 走势对比"
+    "⚔️ 热门美股/ETF 走势对比"
 ])
 
-# Tab 1: 走势与交易建议
+# Tab 1: 走势与量化决策
 with tab1:
-    buy_advice = analyze_trading_signal(hist, latest_price, week_52_high, week_52_low, div_yield)
-    render_advice_card(buy_advice)
+    trading_advice = analyze_trading_signal(hist, latest_price, week_52_high, week_52_low, div_yield)
+    render_advice_card(trading_advice)
 
     col_chart, col_calc = st.columns([2.2, 1])
     
     with col_chart:
-        st.markdown(f'<div class="section-title">📉 {selected_ticker} 历史价格走势曲线</div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="section-title">📉 {user_ticker} 历史价格走势曲线</div>', unsafe_allow_html=True)
         fig_price = px.line(
             filtered_hist, 
             x=filtered_hist.index,  # type: ignore
@@ -124,8 +139,8 @@ with tab1:
         monthly_invest = st.number_input("每月定投 ($)", value=500, step=100)
         invest_years = st.slider("投资期限 (年)", min_value=1, max_value=30, value=10)
         
-        default_return = 11.0 if selected_ticker == "VGT" else (8.0 if selected_ticker == "SCHD" else 8.5)
-        expected_return = st.slider("预期年化收益率 (%)", min_value=1.0, max_value=20.0, value=default_return, step=0.5)
+        default_return = 12.0 if not is_etf else 8.5
+        expected_return = st.slider("预期年化收益率 (%)", min_value=1.0, max_value=30.0, value=default_return, step=0.5)
 
         months = invest_years * 12
         monthly_rate = (1 + expected_return / 100) ** (1/12) - 1
@@ -146,61 +161,70 @@ with tab1:
         </div>
         """, unsafe_allow_html=True)
 
-# Tab 2: 行业分布与重仓股
+# Tab 2: 智能判断 (ETF 显示持仓/行业，个股显示基本面指标)
 with tab2:
-    col_sector, col_holdings = st.columns([1, 1.1])
-    with col_sector:
-        st.markdown(f'<div class="section-title">🧱 {selected_ticker} 行业分布</div>', unsafe_allow_html=True)
-        fig_pie = px.pie(
-            sector_data, 
-            values='Weight', 
-            names='Sector', 
-            hole=0.5,
-            template="plotly",
-            color_discrete_sequence=['#0F766E', '#0D9488', '#14B8A6', '#2DD4BF', '#5EEAD4', '#99F6E4', '#CCFBF1', '#334155']
-        )
-        fig_pie.update_traces(textposition='inside', textinfo='percent+label')
-        fig_pie.update_layout(
-            margin=dict(l=0, r=0, t=10, b=0), 
-            height=360,
-            showlegend=False,
-            paper_bgcolor='rgba(0,0,0,0)',
-            plot_bgcolor='rgba(0,0,0,0)'
-        )
-        st.plotly_chart(fig_pie, use_container_width=True)
-
-    with col_holdings:
-        st.markdown(f'<div class="section-title">🏆 {selected_ticker} Top 10 核心重仓股</div>', unsafe_allow_html=True)
-        st.dataframe(
-            top_holdings,
-            column_config={
-                "Ticker": st.column_config.TextColumn("代码"),
-                "Company": st.column_config.TextColumn("公司名称"),
-                "Weight (%)": st.column_config.ProgressColumn(
-                    "权重占比",
-                    format="%.1f%%",
-                    min_value=0,
-                    max_value=20
+    if is_etf:
+        sector_data, top_holdings = load_etf_holdings_and_sectors(user_ticker)
+        col_sector, col_holdings = st.columns([1, 1.1])
+        with col_sector:
+            st.markdown(f'<div class="section-title">🧱 {user_ticker} 行业分布</div>', unsafe_allow_html=True)
+            if not sector_data.empty:
+                fig_pie = px.pie(
+                    sector_data, 
+                    values='Weight', 
+                    names='Sector', 
+                    hole=0.5,
+                    template="plotly",
+                    color_discrete_sequence=['#0F766E', '#0D9488', '#14B8A6', '#2DD4BF', '#5EEAD4', '#99F6E4', '#CCFBF1', '#334155']
                 )
-            },
-            hide_index=True,
-            use_container_width=True,
-            height=360
-        )
+                fig_pie.update_traces(textposition='inside', textinfo='percent+label')
+                fig_pie.update_layout(margin=dict(l=0, r=0, t=10, b=0), height=360, showlegend=False, paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)')
+                st.plotly_chart(fig_pie, use_container_width=True)
+            else:
+                st.info("暂无行业分布数据。")
 
-# Tab 3: 历史回报与分红 (联动 time_range)
+        with col_holdings:
+            st.markdown(f'<div class="section-title">🏆 {user_ticker} Top 10 核心重仓股</div>', unsafe_allow_html=True)
+            if not top_holdings.empty:
+                st.dataframe(
+                    top_holdings,
+                    column_config={
+                        "Ticker": st.column_config.TextColumn("代码"),
+                        "Company": st.column_config.TextColumn("公司名称"),
+                        "Weight (%)": st.column_config.ProgressColumn("权重占比", format="%.1f%%", min_value=0, max_value=20)
+                    },
+                    hide_index=True,
+                    use_container_width=True,
+                    height=360
+                )
+            else:
+                st.info("暂无重仓股明细数据。")
+    else:
+        # 个股基本面展示
+        st.markdown(f'<div class="section-title">🏢 {user_ticker} 公司关键财务指标</div>', unsafe_allow_html=True)
+        c1, c2, c3, c4 = st.columns(4)
+        c1.metric("市盈率 P/E (TTM)", f"{info.get('trailingPE', 0):.2f}" if info.get('trailingPE') else "N/A")
+        c2.metric("远期市盈率 Forward P/E", f"{info.get('forwardPE', 0):.2f}" if info.get('forwardPE') else "N/A")
+        c3.metric("市净率 P/B", f"{info.get('priceToBook', 0):.2f}" if info.get('priceToBook') else "N/A")
+        c4.metric("净利润率 Profit Margin", f"{info.get('profitMargins', 0)*100:.1f}%" if info.get('profitMargins') else "N/A") # type: ignore
+
+        st.markdown("<br>", unsafe_allow_html=True)
+        st.markdown("##### 📝 公司业务简介")
+        st.write(info.get('longBusinessSummary', '暂无详细介绍。'))
+
+# Tab 3: 历史回报与分红
 with tab3:
     col_annual, col_div = st.columns([1, 1])
     years_limit = get_range_years_limit(time_range)
     
     with col_annual:
-        st.markdown(f'<div class="section-title">📅 {"近 " + time_range if time_range != "Max" else "全历史"} 年度收益率 (%)</div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="section-title">📅 近 {time_range if time_range != "Max" else "历史"} 年度收益率 (%)</div>', unsafe_allow_html=True)
         annual_hist = hist['Close'].resample('YE').last()
         annual_returns = annual_hist.pct_change().dropna() * 100
         annual_df = pd.DataFrame({
             "Year": annual_returns.index.year, # type: ignore
             "Return": annual_returns.values
-        }).tail(years_limit)  # 👈 联动限制显示年数
+        }).tail(years_limit)
         
         annual_df['Color'] = annual_df['Return'].apply(lambda x: '#0F766E' if x >= 0 else '#F43F5E')
         
@@ -225,11 +249,10 @@ with tab3:
         st.plotly_chart(fig_bar, use_container_width=True)
 
     with col_div:
-        st.markdown(f'<div class="section-title">💵 {"近 " + time_range if time_range != "Max" else "全历史"} 每股年度分红 (USD)</div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="section-title">💵 近 {time_range if time_range != "Max" else "历史"} 每股年度分红 (USD)</div>', unsafe_allow_html=True)
         if not dividends.empty:
             div_df = dividends.resample('YE').sum().reset_index()
             div_df['Year'] = div_df['Date'].dt.year
-            # 👈 动态根据选择的时间跨度筛选分红历史
             div_df = div_df.tail(years_limit)
             
             fig_div = px.line(
@@ -257,29 +280,25 @@ with tab3:
             )
             st.plotly_chart(fig_div, use_container_width=True)
         else:
-            st.info("暂无分红数据")
+            st.info("该标的近一年内无派息记录（或不分红）。")
 
-# Tab 4: 收益对比页 (精确计算区间累计收益率)
+# Tab 4: 收益对比页
 with tab4:
     try:
-        # 1. 获取所有标的的原始收盘价
-        df_raw_prices = load_all_historical_returns(["VOO", "VGT", "SCHD"])
-        
-        # 2. 根据选定的时间跨度进行时间切片
+        # 对比标的池：包含当前查询的标的 + 常用基准
+        compare_targets = list(set([user_ticker, "VOO", "VGT", "SCHD"]))
+        df_raw_prices = load_all_historical_returns(compare_targets)
         df_filtered_prices = filter_by_range(df_raw_prices, time_range)
         
-        if not df_filtered_prices.empty: # type: ignore
-            # 3. 正确计算区间真实累计收益率 (%)：(当前价格 / 起点价格 - 1) * 100
+        if not df_filtered_prices.empty and len(df_filtered_prices) > 1: # type: ignore
             start_prices = df_filtered_prices.iloc[0] # type: ignore
             df_cumulative_returns = ((df_filtered_prices / start_prices) - 1) * 100
-            
-            # 4. 渲染图表
             render_comparison_chart(df_cumulative_returns, time_range)
         else:
-            st.warning("所选时间段内无足够的数据进行对比。")
+            st.warning("所选时间段内数据不足，无法生成对比图。")
     except Exception as e:
         st.error(f"加载对比数据失败: {e}")
 
-# 页脚
+# 全局页脚
 st.divider()
-st.caption("💡 声明：本看板仅供个人数据展示与学术研究，不构成任何投资建议。数据源自 Yahoo Finance。用户可在右上角 Settings 菜单中自由切换 Light / Dark 主题。")
+st.caption("💡 声明：本看板支持查询美股所有上市个股与 ETF。数据源自 Yahoo Finance。仅供个人数据展示与研究使用，不构成任何投资建议。")
