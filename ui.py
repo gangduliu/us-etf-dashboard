@@ -359,3 +359,44 @@ def render_portfolio_advisory(suggestions):
             </div>
         </div>
         """, unsafe_allow_html=True)
+
+
+def render_rebalance_dashboard(rebalance_df, total_current_val, target_total_val, new_cash):
+    """渲染一键再平衡计算面板与可视化交易指令"""
+    st.markdown('<div class="section-title">⚖️ 投资组合一键再平衡计算器 (Rebalance Assistant)</div>', unsafe_allow_html=True)
+    
+    # 顶部状态卡片
+    col1, col2, col3 = st.columns(3)
+    col1.metric("当前组合总市值", f"${total_current_val:,.2f}")
+    col2.metric("计划新增入金", f"${new_cash:,.2f}")
+    col3.metric("再平衡后预计总资产", f"${target_total_val:,.2f}")
+
+    st.markdown("<br>", unsafe_allow_html=True)
+    st.markdown("##### 🛒 调仓交易指令明细")
+    
+    if not rebalance_df.empty:
+        # 显示目标权重校验警告
+        total_target_pct = rebalance_df["目标权重 (%)"].sum()
+        if abs(total_target_pct - 100.0) > 0.1:
+            st.warning(f"⚠️ 当前目标权重之和为 **{total_target_pct:.1f}%**，建议调整编辑表格使目标权重之和等于 **100%**。")
+        else:
+            st.success("✅ 目标权重设定完美（合计 100%）。")
+
+        st.dataframe(
+            rebalance_df,
+            column_config={
+                "代码": st.column_config.TextColumn("代码", width="small"),
+                "当前股价 ($)": st.column_config.NumberColumn("当前股价", format="$%.2f"),
+                "当前市值 ($)": st.column_config.NumberColumn("当前市值", format="$%.2f"),
+                "当前实际权重 (%)": st.column_config.NumberColumn("实际权重", format="%.1f%%"),
+                "目标权重 (%)": st.column_config.NumberColumn("目标权重", format="%.1f%%"),
+                "权重偏差 (%)": st.column_config.NumberColumn("偏差 (%)", format="%+.1f%%"),
+                "再平衡建议动作": st.column_config.TextColumn("建议动作", width="medium"),
+                "调整金额 ($)": st.column_config.NumberColumn("建议交易金额", format="$%.2f"),
+                "调整股数": st.column_config.NumberColumn("建议交易股数", format="%.2f 股")
+            },
+            hide_index=True,
+            use_container_width=True
+        )
+    else:
+        st.info("暂无有效持仓数据进行再平衡计算。")

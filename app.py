@@ -16,11 +16,15 @@ from data import (
     get_asset_size_or_market_cap, get_range_years_limit,
     load_portfolio_market_data, get_portfolio_sector_breakdown
 )
-from strategy import analyze_trading_signal, calculate_portfolio_metrics, analyze_portfolio_health
+from strategy import (
+    analyze_trading_signal, calculate_portfolio_metrics,
+    analyze_portfolio_health, calculate_portfolio_rebalance
+)
 from ui import (
     inject_custom_css, render_header, render_kpi_cards, 
     render_advice_card, render_comparison_chart,
-    render_portfolio_summary_cards, render_portfolio_charts, render_portfolio_advisory
+    render_portfolio_summary_cards, render_portfolio_charts,
+    render_portfolio_advisory, render_rebalance_dashboard
 )
 
 # 1. 页面基本配置
@@ -303,27 +307,28 @@ with tab4:
         st.error(f"加载对比数据失败: {e}")
 
 
-# Tab 5: 投资组合管理 (Portfolio Manager)
+# Tab 5: 投资组合管理 & 再平衡计算器
 with tab5:
     st.markdown('<div class="section-title">💼 我的投资组合配置与实盘跟踪</div>', unsafe_allow_html=True)
     
-    # 1. 初始化持仓数据
+    # 1. 初始化持仓数据 (加入 target_pct 目标权重列)
     if "portfolio_data" not in st.session_state:
         st.session_state.portfolio_data = pd.DataFrame([
-            {"ticker": "VOO", "shares": 50.0, "cost_price": 480.0},
-            {"ticker": "VGT", "shares": 30.0, "cost_price": 520.0},
-            {"ticker": "SCHD", "shares": 100.0, "cost_price": 78.0}
+            {"ticker": "VOO", "shares": 50.0, "cost_price": 480.0, "target_pct": 50.0},
+            {"ticker": "VGT", "shares": 30.0, "cost_price": 520.0, "target_pct": 30.0},
+            {"ticker": "SCHD", "shares": 100.0, "cost_price": 78.0, "target_pct": 20.0}
         ])
 
-    # 2. 可收起式编辑区：避免占据大量页面空间
-    with st.expander("✏️ 管理/编辑我的持仓明细（点击展开/折叠）", expanded=False):
-        st.caption("在表格中添加或删除标的、修改持股股数与买入成本价：")
+    # 2. 可收起式持仓与目标权重编辑器
+    with st.expander("✏️ 编辑持仓明细与目标配置权重（点击展开/折叠）", expanded=False):
+        st.caption("设定各标的的【目标权重 (%)】，系统将自动生成偏离度分析与买卖调仓指令：")
         edited_portfolio = st.data_editor(
             st.session_state.portfolio_data,
             column_config={
-                "ticker": st.column_config.TextColumn("代码 (Ticker)", required=True, width="medium"),
-                "shares": st.column_config.NumberColumn("持股数", min_value=0.01, step=1.0, format="%.2f", width="medium"),
-                "cost_price": st.column_config.NumberColumn("成本单价 ($)", min_value=0.01, step=1.0, format="$%.2f", width="medium")
+                "ticker": st.column_config.TextColumn("代码 (Ticker)", required=True, width="small"),
+                "shares": st.column_config.NumberColumn("持股数", min_value=0.01, step=1.0, format="%.2f"),
+                "cost_price": st.column_config.NumberColumn("成本单价 ($)", min_value=0.01, step=1.0, format="$%.2f"),
+                "target_pct": st.column_config.NumberColumn("目标权重 (%)", min_value=0.0, max_value=100.0, step=5.0, format="%.1f%%")
             },
             num_rows="dynamic",
             use_container_width=True,
@@ -343,17 +348,30 @@ with tab5:
         # 4. 顶部核心概览 KPI 卡片
         render_portfolio_summary_cards(p_metrics)
         
-        # 5. 中层图表分析（宽屏并排+外置图例，解决文字重叠）
+        # 5. 中层图表分析 (宽屏排版，不挡图例)
         render_portfolio_charts(p_metrics, sector_p_df)
         
-        if not valid_portfolio.empty:
-            # 新增：运行投资组合健康诊断
-            suggestions = analyze_portfolio_health(valid_portfolio, market_data, sector_p_df)
-            render_portfolio_advisory(suggestions)
+        st.divider()
+
+        # 6. 新增：一键再平衡计算器模块 (结合新资金 DCA)
+        col_rebal_title, col_cash_input = st.columns([2, 1])
+        with col_rebal_title:
+            st.write("")
+        with col_cash_input:
+            new_cash = st.number_input("💵 拟新增投入资金 ($USD):", min_value=0.0, value=0.0, step=500.0, help="输入您本次计划加仓的金额，计算器将自动以存量+新资金综合平衡分配")
+
+        rebalance_df, total_curr_val, target_tot_val = calculate_portfolio_rebalance(valid_portfolio, market_data, new_cash)
+        render_rebalance_dashboard(rebalance_df, total_curr_val, target_tot_val, new_cash)
+
+        st.divider()
+
+        # 7. 组合健康诊断
+        suggestions = analyze_portfolio_health(valid_portfolio, market_data, sector_p_df)
+        render_portfolio_advisory(suggestions)
         
-            st.markdown("<br>", unsafe_allow_html=True)
-        
-        # 6. 底层持仓盈亏明细表格（全宽舒展展示）
+        st.divider()
+
+        # 8. 底层持仓盈亏明细表格
         st.markdown('<div class="section-title">📋 持仓资产盈亏明细表</div>', unsafe_allow_html=True)
         st.dataframe(
             p_metrics['details_df'],

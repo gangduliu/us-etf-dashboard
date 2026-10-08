@@ -178,3 +178,72 @@ def analyze_portfolio_health(portfolio_df, market_data, sector_p_df):
         })
 
     return suggestions
+
+
+def calculate_portfolio_rebalance(portfolio_df, market_data, new_cash=0.0):
+    """
+    根据用户设定的目标权重 (target_pct) 与新增入金 (new_cash)，
+    精确计算存量再平衡与新增资金分配的买卖指令
+    """
+    total_current_val = 0.0
+    rows_data = []
+
+    # 1. 汇总各标的当前市值与目标权重
+    for _, row in portfolio_df.iterrows():
+        t = row['ticker'].strip().upper()
+        shares = row['shares']
+        cost_price = row['cost_price']
+        target_pct = row.get('target_pct', 0.0)
+        
+        latest_price = market_data.get(t, {}).get('latest_price', cost_price)
+        current_val = shares * latest_price
+        total_current_val += current_val
+        
+        rows_data.append({
+            "ticker": t,
+            "shares": shares,
+            "price": latest_price,
+            "current_val": current_val,
+            "target_pct": target_pct
+        })
+
+    if total_current_val == 0 and new_cash == 0:
+        return pd.DataFrame(), 0.0, 0.0
+
+    target_total_val = total_current_val + new_cash
+    orders = []
+
+    # 2. 计算各标的的目标市值与买卖指令
+    for item in rows_data:
+        t = item['ticker']
+        price = item['price']
+        curr_val = item['current_val']
+        curr_pct = (curr_val / total_current_val * 100) if total_current_val > 0 else 0.0
+        target_pct = item['target_pct']
+        
+        # 目标期望市值
+        target_val = target_total_val * (target_pct / 100.0)
+        diff_val = target_val - curr_val
+        diff_shares = (diff_val / price) if price > 0 else 0.0
+        
+        # 判定交易动作
+        if diff_val > 10:  # 买入阈值 $10
+            action = "🟢 买入 (BUY)"
+        elif diff_val < -10:  # 卖出阈值 -$10
+            action = "🔴 卖出 (SELL)"
+        else:
+            action = "⚪ 保持 (HOLD)"
+            
+        orders.append({
+            "代码": t,
+            "当前股价 ($)": price,
+            "当前市值 ($)": curr_val,
+            "当前实际权重 (%)": curr_pct,
+            "目标权重 (%)": target_pct,
+            "权重偏差 (%)": curr_pct - target_pct,
+            "再平衡建议动作": action,
+            "调整金额 ($)": abs(diff_val),
+            "调整股数": abs(diff_shares)
+        })
+
+    return pd.DataFrame(orders), total_current_val, target_total_val
