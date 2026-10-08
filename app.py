@@ -18,13 +18,15 @@ from data import (
 )
 from strategy import (
     analyze_trading_signal, calculate_portfolio_metrics,
-    analyze_portfolio_health, calculate_portfolio_rebalance
+    analyze_portfolio_health, calculate_portfolio_rebalance,
+    calculate_portfolio_dividends
 )
 from ui import (
     inject_custom_css, render_header, render_kpi_cards, 
     render_advice_card, render_comparison_chart,
     render_portfolio_summary_cards, render_portfolio_charts,
-    render_portfolio_advisory, render_rebalance_dashboard
+    render_portfolio_advisory, render_rebalance_dashboard,
+    render_dividend_dashboard
 )
 
 # 1. 页面基本配置
@@ -91,7 +93,7 @@ pct_change = (price_change / prev_price) * 100 if prev_price > 0 else 0
 
 week_52_high = info.get('fiftyTwoWeekHigh', hist['Close'].tail(252).max())
 week_52_low = info.get('fiftyTwoWeekLow', hist['Close'].tail(252).min())
-div_yield = calculate_ttm_dividend_yield(dividends, latest_price, info)
+div_yield = calculate_ttm_dividend_yield(dividends, latest_price, info, user_ticker)
 size_val = get_asset_size_or_market_cap(info)
 
 # 4. 渲染 Banner & 动态 KPI 卡片
@@ -362,6 +364,23 @@ with tab5:
 
         rebalance_df, total_curr_val, target_tot_val = calculate_portfolio_rebalance(valid_portfolio, market_data, new_cash)
         render_rebalance_dashboard(rebalance_df, total_curr_val, target_tot_val, new_cash)
+
+        st.divider()
+
+        if not valid_portfolio.empty:
+            # 批量获取各持仓标的原始分红数据 (供现金流月度分布计算)
+            raw_dividends_dict = {}
+            for _, row in valid_portfolio.iterrows():
+                t = row['ticker'].strip().upper()
+                try:
+                    _, _, divs, _ = load_stock_or_etf_data(t)
+                    raw_dividends_dict[t] = divs
+                except Exception:
+                    pass
+
+        # 计算并渲染 股息现金流预估看板
+        div_metrics = calculate_portfolio_dividends(valid_portfolio, market_data, raw_dividends_dict)
+        render_dividend_dashboard(div_metrics)
 
         st.divider()
 

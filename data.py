@@ -99,47 +99,112 @@ def get_range_years_limit(range_str):
     return mapping.get(range_str, 10)
 
 
-def calculate_ttm_dividend_yield(dividends, latest_price, info):
-    if not dividends.empty:
-        one_year_ago = datetime.now() - timedelta(days=365)
-        recent_divs = dividends[dividends.index >= one_year_ago]
-        ttm_dividends = recent_divs.sum()
-        if latest_price > 0:
-            return (ttm_dividends / latest_price) * 100
-            
-    raw_yield = info.get('dividendYield', 0.0) or info.get('trailingAnnualDividendYield', 0.0)
-    return raw_yield * 100 if raw_yield < 0.2 else raw_yield
-
-
 def get_asset_size_or_market_cap(info):
     """自动判断提取市值 (Market Cap) 或基金规模 (AUM)"""
     val = info.get('totalAssets') or info.get('marketCap') or info.get('netAssets') or 0
     return val
 
 
-@st.cache_data(ttl=900)  # 组合实时价格 15 分钟缓存
+# 常见标的基准 TTM 股息率兜底表 (云端 API 彻底失效时使用)
+KNOWN_DIVIDEND_YIELDS = {
+    "SCHD": 3.45,
+    "VOO": 1.35,
+    "VGT": 0.65,
+    "QQQ": 0.60,
+    "SPY": 1.30,
+    "AAPL": 0.50,
+    "MSFT": 0.70,
+    "NVDA": 0.08,
+    "KO": 3.10,
+    "PEP": 3.00,
+    "JNJ": 3.20,
+    "O": 5.40
+}
+
+
+def calculate_ttm_dividend_yield(dividends, latest_price, info, ticker_symbol=""):
+    """
+    三层递进算清股息率：
+    1. 优先使用近 12 个月实际派息总额 / 最新股价
+    2. 其次提取 info 字典中的各种 Yield 字段
+    3. 最后使用 Known 静态基准兜底
+    """
+    ticker_symbol = ticker_symbol.strip().upper()
+
+    # 1. 第一层：基于近 365 天真实历史分红数据计算
+    if dividends is not None and not dividends.empty and latest_price > 0:
+        try:
+            one_year_ago = datetime.now() - timedelta(days=365)
+            # 兼容带/不带时区的时间戳
+            if dividends.index.tz is not None:
+                dividends.index = dividends.index.tz_localize(None)
+            
+            recent_divs = dividends[dividends.index >= one_year_ago]
+            ttm_sum = recent_divs.sum()
+            
+            if ttm_sum > 0:
+                calc_yield = (ttm_sum / latest_price) * 100.0
+                return round(calc_yield, 2)
+        except Exception:
+            pass
+
+    # 2. 第二层：从 info 字典多种可能字段中提取
+    if info:
+        raw_yield = (
+            info.get('dividendYield') or 
+            info.get('trailingAnnualDividendYield') or 
+            info.get('yield') or 0.0
+        )
+        if isinstance(raw_yield, (int, float)) and raw_yield > 0:
+            # yfinance 部分字段返回小数 (如 0.0345)，部分返回百分比 (如 3.45)
+            final_yield = raw_yield * 100.0 if raw_yield < 0.25 else raw_yield
+            return round(final_yield, 2)
+
+    # 3. 第三层：已知标的静态基准兜底
+    if ticker_symbol in KNOWN_DIVIDEND_YIELDS:
+        return KNOWN_DIVIDEND_YIELDS[ticker_symbol]
+
+    return 0.0
+
+
+@st.cache_data(ttl=900)
 def load_portfolio_market_data(tickers):
-    """批量获取投资组合中所有标的最新价格、前一日收盘价及基本信息"""
+    """批量获取持仓标的最新价格、前一日收盘价及强力计算出的股息率"""
     data = {}
     for ticker_symbol in tickers:
-        ticker_symbol = ticker_symbol.strip().upper()
-        if not ticker_symbol:
+        t = ticker_symbol.strip().upper()
+        if not t:
             continue
         try:
-            ticker = yf.Ticker(ticker_symbol)
+            ticker = yf.Ticker(t)
             hist = ticker.history(period="5d")
             if not hist.empty:
-                latest_price = hist['Close'].iloc[-1]
-                prev_price = hist['Close'].iloc[-2] if len(hist) > 1 else latest_price
+                latest_price = float(hist['Close'].iloc[-1])
+                prev_price = float(hist['Close'].iloc[-2]) if len(hist) > 1 else latest_price
+                
                 info = ticker.info or {}
-                data[ticker_symbol] = {
+                dividends = ticker.dividends
+                
+                # 👈 使用强化版的股息率计算工具
+                div_yield = calculate_ttm_dividend_yield(dividends, latest_price, info, t)
+
+                data[t] = {
                     "latest_price": latest_price,
                     "prev_price": prev_price,
-                    "name": info.get('shortName') or info.get('longName') or ticker_symbol,
+                    "div_yield": div_yield, # 保证必定能拿到数值
+                    "name": info.get('shortName') or info.get('longName') or t,
                     "quote_type": info.get('quoteType', 'EQUITY')
                 }
         except Exception:
-            pass
+            # 异常时赋予静态兜底，防止崩溃
+            fallback_yield = KNOWN_DIVIDEND_YIELDS.get(t, 0.0)
+            data[t] = {
+                "latest_price": 100.0,
+                "prev_price": 100.0,
+                "div_yield": fallback_yield,
+                "name": t,
+                "quote_type": 'EQUITY'
+            }
     return data
 
 

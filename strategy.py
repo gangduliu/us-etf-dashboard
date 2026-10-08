@@ -1,4 +1,5 @@
 import pandas as pd
+from datetime import datetime, timedelta
 
 def analyze_trading_signal(hist, latest_price, week_52_high, week_52_low, div_yield):
     """
@@ -247,3 +248,75 @@ def calculate_portfolio_rebalance(portfolio_df, market_data, new_cash=0.0):
         })
 
     return pd.DataFrame(orders), total_current_val, target_total_val
+
+
+def calculate_portfolio_dividends(portfolio_df, market_data, raw_dividends_dict):
+    """
+    穿透计算投资组合的加权股息率、预计年化现金流，
+    并根据各标的历史派息月份预估未来 12 个月的月度被动收入分布。
+    """
+    total_portfolio_value = 0.0
+    total_annual_cashflow = 0.0
+    monthly_cashflow = {m: 0.0 for m in range(1, 13)}
+    breakdown_rows = []
+
+    # 1. 遍历持仓标的计算股息与派息月份
+    for _, row in portfolio_df.iterrows():
+        t = row['ticker'].strip().upper()
+        shares = row['shares']
+        cost_price = row['cost_price']
+        
+        m_info = market_data.get(t, {})
+        latest_price = m_info.get('latest_price', cost_price)
+        pos_val = shares * latest_price
+        total_portfolio_value += pos_val
+        
+        div_yield = m_info.get('div_yield', 0.0) # TTM 股息率 (%)
+        divs = raw_dividends_dict.get(t, pd.Series(dtype=float))
+        
+        # 计算该标的预估年化派息总额
+        annual_div_per_share = (div_yield / 100.0) * latest_price
+        pos_annual_cashflow = shares * annual_div_per_share
+        total_annual_cashflow += pos_annual_cashflow
+        
+        # 识别该标的近一年的派息月份 (美股通常按季派息，如 3, 6, 9, 12 月)
+        pay_months = []
+        if not divs.empty:
+            one_year_ago = datetime.now() - timedelta(days=365)
+            recent_divs = divs[divs.index >= one_year_ago]
+            if not recent_divs.empty:
+                pay_months = sorted(list(set(recent_divs.index.month)))
+        
+        # 若无历史数据，默认美股标准季度派息 (3, 6, 9, 12 月)
+        if not pay_months:
+            pay_months = [3, 6, 9, 12]
+            
+        # 将派息按月份平均归集
+        div_per_payout = pos_annual_cashflow / len(pay_months) if pay_months else 0.0
+        for m in pay_months:
+            monthly_cashflow[m] += div_per_payout
+            
+        breakdown_rows.append({
+            "代码": t,
+            "当前持仓市值 ($)": pos_val,
+            "股息率 (TTM %)": div_yield,
+            "每股年派息 ($)": annual_div_per_share,
+            "预计年领股息 ($)": pos_annual_cashflow,
+            "历史派息月份": ", ".join([f"{m}月" for m in pay_months])
+        })
+
+    # 计算组合综合加权股息率
+    portfolio_div_yield = (total_annual_cashflow / total_portfolio_value * 100.0) if total_portfolio_value > 0 else 0.0
+
+    # 构建月度现金流 DataFrame
+    monthly_df = pd.DataFrame([
+        {"月份": f"{m}月", "Month_Num": m, "预计领息 ($)": monthly_cashflow[m]}
+        for m in range(1, 13)
+    ])
+
+    return {
+        "portfolio_div_yield": portfolio_div_yield,
+        "total_annual_cashflow": total_annual_cashflow,
+        "monthly_df": monthly_df,
+        "breakdown_df": pd.DataFrame(breakdown_rows)
+    }
