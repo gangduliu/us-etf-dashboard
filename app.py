@@ -13,12 +13,14 @@ import plotly.express as px
 from data import (
     load_stock_or_etf_data, load_etf_holdings_and_sectors, 
     load_all_historical_returns, filter_by_range, calculate_ttm_dividend_yield,
-    get_asset_size_or_market_cap, get_range_years_limit
+    get_asset_size_or_market_cap, get_range_years_limit,
+    load_portfolio_market_data, get_portfolio_sector_breakdown
 )
-from strategy import analyze_trading_signal
+from strategy import analyze_trading_signal, calculate_portfolio_metrics
 from ui import (
     inject_custom_css, render_header, render_kpi_cards, 
-    render_advice_card, render_comparison_chart
+    render_advice_card, render_comparison_chart,
+    render_portfolio_summary_cards, render_portfolio_charts
 )
 
 # 1. 页面基本配置
@@ -94,11 +96,12 @@ render_kpi_cards(latest_price, price_change, pct_change, week_52_high, week_52_l
 
 # 5. 动态 Tab 命名
 tab2_title = "🧩 行业分布与重仓股" if is_etf else "🏢 核心财务与公司概况"
-tab1, tab2, tab3, tab4 = st.tabs([
+tab1, tab2, tab3, tab4, tab5 = st.tabs([
     f"📊 {user_ticker} 走势与策略", 
     tab2_title, 
     "💰 历史回报与分红", 
-    "⚔️ 热门美股/ETF 走势对比"
+    "⚔️ 热门美股/ETF 走势对比",
+    "💼 投资组合管理" # <--- 新增 Tab
 ])
 
 # Tab 1: 走势与量化决策
@@ -298,6 +301,74 @@ with tab4:
             st.warning("所选时间段内数据不足，无法生成对比图。")
     except Exception as e:
         st.error(f"加载对比数据失败: {e}")
+
+
+# Tab 5: 投资组合管理 (Portfolio Manager)
+with tab5:
+    st.markdown('<div class="section-title">💼 我的投资组合配置与实盘跟踪</div>', unsafe_allow_html=True)
+    
+    # 1. 初始化持仓数据
+    if "portfolio_data" not in st.session_state:
+        st.session_state.portfolio_data = pd.DataFrame([
+            {"ticker": "VOO", "shares": 50.0, "cost_price": 480.0},
+            {"ticker": "VGT", "shares": 30.0, "cost_price": 520.0},
+            {"ticker": "SCHD", "shares": 100.0, "cost_price": 78.0}
+        ])
+
+    # 2. 可收起式编辑区：避免占据大量页面空间
+    with st.expander("✏️ 管理/编辑我的持仓明细（点击展开/折叠）", expanded=False):
+        st.caption("在表格中添加或删除标的、修改持股股数与买入成本价：")
+        edited_portfolio = st.data_editor(
+            st.session_state.portfolio_data,
+            column_config={
+                "ticker": st.column_config.TextColumn("代码 (Ticker)", required=True, width="medium"),
+                "shares": st.column_config.NumberColumn("持股数", min_value=0.01, step=1.0, format="%.2f", width="medium"),
+                "cost_price": st.column_config.NumberColumn("成本单价 ($)", min_value=0.01, step=1.0, format="$%.2f", width="medium")
+            },
+            num_rows="dynamic",
+            use_container_width=True,
+            key="portfolio_editor"
+        )
+        st.session_state.portfolio_data = edited_portfolio
+
+    # 3. 核心计算与数据准备
+    valid_portfolio = st.session_state.portfolio_data.dropna()
+    
+    if not valid_portfolio.empty:
+        portfolio_tickers = valid_portfolio['ticker'].unique().tolist()
+        market_data = load_portfolio_market_data(portfolio_tickers)
+        p_metrics = calculate_portfolio_metrics(valid_portfolio, market_data)
+        sector_p_df = get_portfolio_sector_breakdown(valid_portfolio, market_data)
+
+        # 4. 顶部核心概览 KPI 卡片
+        render_portfolio_summary_cards(p_metrics)
+        
+        # 5. 中层图表分析（宽屏并排+外置图例，解决文字重叠）
+        render_portfolio_charts(p_metrics, sector_p_df)
+        
+        st.markdown("<br>", unsafe_allow_html=True)
+        
+        # 6. 底层持仓盈亏明细表格（全宽舒展展示）
+        st.markdown('<div class="section-title">📋 持仓资产盈亏明细表</div>', unsafe_allow_html=True)
+        st.dataframe(
+            p_metrics['details_df'],
+            column_config={
+                "代码": st.column_config.TextColumn("代码", width="small"),
+                "名称": st.column_config.TextColumn("名称", width="large"),
+                "持仓股数": st.column_config.NumberColumn("持股数", format="%.2f"),
+                "持仓成本价 ($)": st.column_config.NumberColumn("成本价", format="$%.2f"),
+                "当前现价 ($)": st.column_config.NumberColumn("当前现价", format="$%.2f"),
+                "当前总市值 ($)": st.column_config.NumberColumn("总市值", format="$%.2f"),
+                "持仓成本总额 ($)": st.column_config.NumberColumn("成本总额", format="$%.2f"),
+                "累计盈亏 ($)": st.column_config.NumberColumn("累计盈亏", format="$%.2f"),
+                "累计收益率 (%)": st.column_config.NumberColumn("收益率", format="%.2f%%"),
+                "当日盈亏 ($)": st.column_config.NumberColumn("当日盈亏", format="$%.2f")
+            },
+            hide_index=True,
+            use_container_width=True
+        )
+    else:
+        st.info("💡 请展开上方编辑面板，添加至少一只持仓标的。")
 
 # 全局页脚
 st.divider()

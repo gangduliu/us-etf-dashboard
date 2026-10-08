@@ -115,3 +115,64 @@ def get_asset_size_or_market_cap(info):
     """自动判断提取市值 (Market Cap) 或基金规模 (AUM)"""
     val = info.get('totalAssets') or info.get('marketCap') or info.get('netAssets') or 0
     return val
+
+
+@st.cache_data(ttl=900)  # 组合实时价格 15 分钟缓存
+def load_portfolio_market_data(tickers):
+    """批量获取投资组合中所有标的最新价格、前一日收盘价及基本信息"""
+    data = {}
+    for ticker_symbol in tickers:
+        ticker_symbol = ticker_symbol.strip().upper()
+        if not ticker_symbol:
+            continue
+        try:
+            ticker = yf.Ticker(ticker_symbol)
+            hist = ticker.history(period="5d")
+            if not hist.empty:
+                latest_price = hist['Close'].iloc[-1]
+                prev_price = hist['Close'].iloc[-2] if len(hist) > 1 else latest_price
+                info = ticker.info or {}
+                data[ticker_symbol] = {
+                    "latest_price": latest_price,
+                    "prev_price": prev_price,
+                    "name": info.get('shortName') or info.get('longName') or ticker_symbol,
+                    "quote_type": info.get('quoteType', 'EQUITY')
+                }
+        except Exception:
+            pass
+    return data
+
+
+@st.cache_data(ttl=86400)
+def get_portfolio_sector_breakdown(portfolio_df, market_data):
+    """穿透计算投资组合的综合行业配置分布 (%)"""
+    sector_weights = {}
+    total_portfolio_value = sum(
+        row['shares'] * market_data.get(row['ticker'], {}).get('latest_price', row['cost_price'])
+        for _, row in portfolio_df.iterrows()
+    )
+    
+    if total_portfolio_value == 0:
+        return pd.DataFrame()
+
+    for _, row in portfolio_df.iterrows():
+        t = row['ticker']
+        shares = row['shares']
+        price = market_data.get(t, {}).get('latest_price', row['cost_price'])
+        position_value = shares * price
+        position_weight = position_value / total_portfolio_value
+
+        # 获取单标的行业分布
+        sector_df, _ = load_etf_holdings_and_sectors(t)
+        if not sector_df.empty:
+            for _, s_row in sector_df.iterrows():
+                sec_name = s_row['Sector']
+                sec_w = (s_row['Weight'] / 100) * position_weight * 100
+                sector_weights[sec_name] = sector_weights.get(sec_name, 0) + sec_w
+        else:
+            # 个股或其他
+            sec_name = "其他 / 个股"
+            sector_weights[sec_name] = sector_weights.get(sec_name, 0) + (position_weight * 100)
+
+    res_df = pd.DataFrame(list(sector_weights.items()), columns=['Sector', 'Weight'])
+    return res_df.sort_values(by='Weight', ascending=False)

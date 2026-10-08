@@ -1,6 +1,5 @@
 import streamlit as st
 import plotly.express as px
-from datetime import datetime
 
 PRIMARY_COLOR = "#0F766E"
 PRIMARY_LIGHT = "#14B8A6"
@@ -219,3 +218,114 @@ def render_comparison_chart(df_compare, time_range):
         yaxis=dict(showgrid=True, title="累计收益率 (%)")
     )
     st.plotly_chart(fig, use_container_width=True)
+
+
+def render_portfolio_summary_cards(p_metrics):
+    """渲染组合顶部的 4 大概览 KPI 卡片（增加外边距与排版空间）"""
+    col1, col2, col3, col4 = st.columns(4)
+    
+    col1.metric(
+        label="组合总市值 (USD)",
+        value=f"${p_metrics['total_market_value']:,.2f}",
+        delta=f"总成本: ${p_metrics['total_cost']:,.2f}",
+        delta_color="off"
+    )
+    
+    profit_color = "normal" if p_metrics['total_profit'] >= 0 else "inverse"
+    col2.metric(
+        label="累计浮盈 / 浮亏",
+        value=f"${p_metrics['total_profit']:+,.2f}",
+        delta=f"{p_metrics['total_profit_pct']:+.2f}%",
+        delta_color=profit_color
+    )
+    
+    daily_color = "normal" if p_metrics['daily_gain_loss'] >= 0 else "inverse"
+    col3.metric(
+        label="预估当日盈亏",
+        value=f"${p_metrics['daily_gain_loss']:+,.2f}",
+        delta="较前一交易日收盘",
+        delta_color=daily_color
+    )
+    
+    pos_count = len(p_metrics['details_df'])
+    col4.metric(
+        label="持仓标的数量",
+        value=f"{pos_count} 只",
+        delta="资产分散配置",
+        delta_color="off"
+    )
+    st.markdown("<div style='margin-bottom: 12px;'></div>", unsafe_allow_html=True)
+
+
+def render_portfolio_charts(p_metrics, sector_p_df):
+    """优化组合图表排版，彻底解决图例与饼图重叠遮挡的问题"""
+    col_p1, col_p2 = st.columns(2)
+    
+    with col_p1:
+        st.markdown('<div class="section-title">🍰 持仓标的资产占比 (%)</div>', unsafe_allow_html=True)
+        fig_holdings_pie = px.pie(
+            p_metrics['details_df'],
+            values='当前总市值 ($)',
+            names='代码',
+            hole=0.45,
+            template="plotly",
+            color_discrete_sequence=['#0F766E', '#14B8A6', '#2DD4BF', '#0284C7', '#38BDF8', '#818CF8']
+        )
+        fig_holdings_pie.update_traces(
+            textposition='inside', 
+            textinfo='percent',
+            hovertemplate="代码: <b>%{label}</b><br>占比: %{percent}<br>市值: <b>$%{value:,.2f}</b><extra></extra>"
+        )
+        fig_holdings_pie.update_layout(
+            # 关键调整 1: 预留充足的底部边距 (b=80)，防止底部的图例与饼图重叠
+            margin=dict(l=20, r=20, t=20, b=80), 
+            height=360, 
+            showlegend=True,
+            # 关键调整 2: 精准控制图例在底部居中，并且位于饼图绘制区域下方
+            legend=dict(
+                orientation="h", 
+                yanchor="top", 
+                y=-0.15, 
+                xanchor="center", 
+                x=0.5
+            ),
+            paper_bgcolor='rgba(0,0,0,0)', 
+            plot_bgcolor='rgba(0,0,0,0)'
+        )
+        st.plotly_chart(fig_holdings_pie, use_container_width=True)
+
+    with col_p2:
+        st.markdown('<div class="section-title">🧱 组合穿透综合行业配置 (%)</div>', unsafe_allow_html=True)
+        if not sector_p_df.empty:
+            fig_sec_pie = px.pie(
+                sector_p_df,
+                values='Weight',
+                names='Sector',
+                hole=0.45,
+                template="plotly",
+                color_discrete_sequence=['#0F766E', '#0D9488', '#14B8A6', '#2DD4BF', '#5EEAD4', '#99F6E4', '#334155']
+            )
+            fig_sec_pie.update_traces(
+                textposition='inside', 
+                textinfo='percent',
+                hovertemplate="行业: <b>%{label}</b><br>穿透权重: <b>%{value:.1f}%</b><extra></extra>"
+            )
+            fig_sec_pie.update_layout(
+                # 关键调整 1: 预留充足的底部边距 (b=80)
+                margin=dict(l=20, r=20, t=20, b=80), 
+                height=360, 
+                showlegend=True,
+                # 关键调整 2: 下插图例置于饼图正下方
+                legend=dict(
+                    orientation="h", 
+                    yanchor="top", 
+                    y=-0.15, 
+                    xanchor="center", 
+                    x=0.5
+                ),
+                paper_bgcolor='rgba(0,0,0,0)', 
+                plot_bgcolor='rgba(0,0,0,0)'
+            )
+            st.plotly_chart(fig_sec_pie, use_container_width=True)
+        else:
+            st.info("暂无组合行业穿透数据。")

@@ -1,3 +1,5 @@
+import pandas as pd
+
 def analyze_trading_signal(hist, latest_price, week_52_high, week_52_low, div_yield):
     """
     根据 MA200 均线、52 周相对高低位、RSI 指标及偏离度计算综合买卖/再平衡建议
@@ -61,4 +63,58 @@ def analyze_trading_signal(hist, latest_price, week_52_high, week_52_low, div_yi
         "rsi": rsi,
         "badge_color": badge_color,
         "badge_bg": badge_bg
+    }
+
+
+def calculate_portfolio_metrics(portfolio_df, market_data):
+    """计算投资组合的总资产、总成本、累计浮盈浮亏及当日盈亏"""
+    total_cost = 0.0
+    total_market_value = 0.0
+    daily_gain_loss = 0.0
+    
+    detailed_rows = []
+    
+    for _, row in portfolio_df.iterrows():
+        t = row['ticker']
+        shares = row['shares']
+        cost_price = row['cost_price']
+        
+        m_info = market_data.get(t, {})
+        latest_price = m_info.get('latest_price', cost_price)
+        prev_price = m_info.get('prev_price', latest_price)
+        
+        pos_cost = shares * cost_price
+        pos_value = shares * latest_price
+        pos_profit = pos_value - pos_cost
+        pos_profit_pct = (pos_profit / pos_cost * 100) if pos_cost > 0 else 0
+        
+        pos_daily = shares * (latest_price - prev_price)
+        
+        total_cost += pos_cost
+        total_market_value += pos_value
+        daily_gain_loss += pos_daily
+        
+        detailed_rows.append({
+            "代码": t,
+            "名称": m_info.get('name', t),
+            "持仓股数": shares,
+            "持仓成本价 ($)": cost_price,
+            "当前现价 ($)": latest_price,
+            "当前总市值 ($)": pos_value,
+            "持仓成本总额 ($)": pos_cost,
+            "累计盈亏 ($)": pos_profit,
+            "累计收益率 (%)": pos_profit_pct,
+            "当日盈亏 ($)": pos_daily
+        })
+
+    total_profit = total_market_value - total_cost
+    total_profit_pct = (total_profit / total_cost * 100) if total_cost > 0 else 0
+    
+    return {
+        "total_cost": total_cost,
+        "total_market_value": total_market_value,
+        "total_profit": total_profit,
+        "total_profit_pct": total_profit_pct,
+        "daily_gain_loss": daily_gain_loss,
+        "details_df": pd.DataFrame(detailed_rows)
     }
