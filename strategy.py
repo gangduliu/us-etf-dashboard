@@ -121,18 +121,21 @@ def calculate_portfolio_metrics(portfolio_df, market_data):
     }
 
 
+# 常见宽基 ETF 与 行业/高股息 ETF 识别分类库
+BROAD_MARKET_ETFS = {"VOO", "VT", "SPY", "IVV", "QQQ", "VTI", "SCHB", "SPLG"}
+SECTOR_THEME_ETFS = {"VGT", "SCHD", "XLE", "XLF", "XLK", "XLV", "ARKK", "SMH", "SOXX", "JEPI", "JEPQ", "IWM"}
+
 def analyze_portfolio_health(portfolio_df, market_data, sector_p_df):
     """
-    对投资组合进行健康诊断，提供分散度警告、行业集中度风险与再平衡建议
+    方案 B: 风格区分版诊断算法
+    根据 宽基 ETF / 行业及主题 ETF / 单股票 采用不同的集中度阈值
     """
     suggestions = []
-    
-    # 1. 计算各持仓标的的当前市值与权重占比
     total_val = 0.0
     pos_weights = {}
-    
+
     for _, row in portfolio_df.iterrows():
-        t = row['ticker']
+        t = row['ticker'].strip().upper()
         shares = row['shares']
         price = market_data.get(t, {}).get('latest_price', row['cost_price'])
         v = shares * price
@@ -142,40 +145,87 @@ def analyze_portfolio_health(portfolio_df, market_data, sector_p_df):
     if total_val == 0:
         return suggestions
 
-    # 计算百分比占比
     pos_pcts = {t: (v / total_val * 100) for t, v in pos_weights.items()}
 
-    # 2. 诊断一：单一标的集中度风险
+    # 1. 区分资产风格判定集中度
     for t, pct in pos_pcts.items():
-        if pct > 40.0:
-            suggestions.append({
-                "level": "WARNING",
-                "title": f"⚠️ 标的集中度风险: {t} 占比高达 {pct:.1f}%",
-                "desc": f"单个标的 {t} 占总资产比例超过 40%，组合价格波动受该标的单边影响较大。建议新增资金优先分配至其他低估标的，或适度止盈以降低集中度。"
-            })
+        m_info = market_data.get(t, {})
+        quote_type = m_info.get('quote_type', 'EQUITY').upper()
+        
+        # 判断资产分类
+        is_broad_etf = t in BROAD_MARKET_ETFS
+        is_sector_etf = t in SECTOR_THEME_ETFS or (quote_type in ['ETF', 'MUTUALFUND'] and not is_broad_etf)
+        is_single_stock = not is_broad_etf and not is_sector_etf
 
-    # 3. 诊断二：行业集中度暴露
+        if is_broad_etf:
+            # 🌐 宽基 ETF 阈值：> 65% 高危, > 50% 预警
+            if pct > 65.0:
+                suggestions.append({
+                    "level": "DANGER",
+                    "title": f"🔴 宽基 ETF 占比极高: {t} 达 {pct:.1f}%",
+                    "desc": f"{t} 为全市场宽基 ETF，虽然分散度极佳，但超过 65% 使得组合缺乏其他风格资产（如高股息/增长型）的补充调节。"
+                })
+            elif pct > 50.0:
+                suggestions.append({
+                    "level": "INFO",
+                    "title": f"🔵 核心压舱石持仓: {t} 占比 {pct:.1f}%",
+                    "desc": f"{t} 作为核心压舱石配置正常（>50%）。建议后续新入金可适度分配至卫星资产（如行业 ETF 或优质个股）。"
+                })
+
+        elif is_sector_etf:
+            # 🧱 行业/主题/高股息 ETF 阈值：> 45% 高危, > 35% 预警
+            if pct > 45.0:
+                suggestions.append({
+                    "level": "DANGER",
+                    "title": f"🔴 行业/主题 ETF 严重集中: {t} 占比 {pct:.1f}%",
+                    "desc": f"{t} 为行业/风格主题 ETF，占比超过 45% 容易让组合遭受单一行业（如科技挤估值或高股息跑输大盘）的周期性冲击。"
+                })
+            elif pct > 35.0:
+                suggestions.append({
+                    "level": "WARNING",
+                    "title": f"🟡 行业/主题 ETF 占比偏高: {t} 占比 {pct:.1f}%",
+                    "desc": f"{t} 占比已超过 35%。建议暂停增持该主题，将新资金分配给宽基指数或低相关性资产。"
+                })
+
+        elif is_single_stock:
+            # 🏢 个股/单股票 阈值：> 30% 高危, > 15% 预警
+            if pct > 30.0:
+                suggestions.append({
+                    "level": "DANGER",
+                    "title": f"🔴 单股票黑天鹅风险高危: {t} 占比高达 {pct:.1f}%",
+                    "desc": f"个股 {t} 占比已突破 30%！个股面临公司财报、管理层与行业竞争等特有风险，强烈建议锁定部分利润或止盈减仓。"
+                })
+            elif pct > 15.0:
+                suggestions.append({
+                    "level": "WARNING",
+                    "title": f"🟡 单个股集中度预警: {t} 占比 {pct:.1f}%",
+                    "desc": f"单个股票 {t} 权重超过 15%。建议将个股持仓控制在合理范围内，避免个股波动剧烈拉低整体组合表现。"
+                })
+
+    # 2. 穿透行业集中度诊断 (行业权重 > 45% 预警)
     if not sector_p_df.empty:
         top_sector = sector_p_df.iloc[0]
-        if top_sector['Weight'] > 50.0:
+        sec_name = top_sector['Sector']
+        sec_weight = top_sector['Weight']
+        
+        if sec_weight > 50.0:
+            suggestions.append({
+                "level": "DANGER",
+                "title": f"🔴 穿透行业严重暴露: {sec_name} 占比达 {sec_weight:.1f}%",
+                "desc": f"组合穿透后在 **{sec_name}** 行业的总体配置已过半（包含直接持股与 ETF 间接持股），行业集中风险较大。"
+            })
+        elif sec_weight > 38.0:
             suggestions.append({
                 "level": "WARNING",
-                "title": f"⚠️ 行业过度集中: {top_sector['Sector']} 行业占比达 {top_sector['Weight']:.1f}%",
-                "desc": f"组合在 **{top_sector['Sector']}** 行业的穿透配置过半，若该行业面临系统性回调（如科技股大幅挤估值），组合回撤压力会显著增加。建议补充非相关性资产（如高股息 SCHD 或防守型资产）。"
+                "title": f"🟡 穿透行业偏好集中: {sec_name} 占比 {sec_weight:.1f}%",
+                "desc": f"组合在 **{sec_name}** 行业配置较为集中（>38%），注意科技或相关行业的估值波动风险。"
             })
 
-    # 4. 诊断三：组合分散度与再平衡状态
-    if len(pos_pcts) == 1:
-        suggestions.append({
-            "level": "INFO",
-            "title": "💡 组合单一度提示",
-            "desc": "当前组合仅包含 1 只标的。若为 VOO 等宽基指数 ETF 可长期持有；若是单一个股，建议引入其他资产以降低个股特有风险。"
-        })
-    elif len(suggestions) == 0:
+    if not suggestions:
         suggestions.append({
             "level": "SUCCESS",
-            "title": "🟢 组合健康度良好 / 配置均衡",
-            "desc": "持仓标的与行业分布较为健康，未出现极端的单一集中度风险。建议继续保持按既定频率（如半年或一年）进行常态化再平衡。"
+            "title": "🟢 资产风格分类配置健康",
+            "desc": "当前宽基 ETF、行业 ETF 与个股的配置比例符合风险控制标准，未发现异常集中度风险。"
         })
 
     return suggestions

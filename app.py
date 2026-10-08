@@ -316,9 +316,9 @@ with tab5:
     # 1. 初始化持仓数据 (加入 target_pct 目标权重列)
     if "portfolio_data" not in st.session_state:
         st.session_state.portfolio_data = pd.DataFrame([
-            {"ticker": "VOO", "shares": 50.0, "cost_price": 480.0, "target_pct": 50.0},
-            {"ticker": "VGT", "shares": 30.0, "cost_price": 520.0, "target_pct": 30.0},
-            {"ticker": "SCHD", "shares": 100.0, "cost_price": 78.0, "target_pct": 20.0}
+            {"ticker": "VOO", "shares": 5.0, "cost_price": 700.0, "target_pct": 60.0},
+            {"ticker": "VGT", "shares": 6.0, "cost_price": 120.0, "target_pct": 20.0},
+            {"ticker": "SCHD", "shares": 20.0, "cost_price": 30.0, "target_pct": 20.0}
         ])
 
     # 2. 可收起式持仓与目标权重编辑器

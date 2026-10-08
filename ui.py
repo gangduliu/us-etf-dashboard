@@ -332,29 +332,33 @@ def render_portfolio_charts(p_metrics, sector_p_df):
 
 
 def render_portfolio_advisory(suggestions):
-    """渲染投资组合量化管理与诊断建议"""
-    st.markdown('<div class="section-title">💡 投资组合健康诊断与优化建议</div>', unsafe_allow_html=True)
+    """渲染投资组合量化管理与诊断建议 (支持 DANGER 高危级别)"""
+    st.markdown('<div class="section-title">💡 投资组合健康诊断与优化建议 (风格区分版)</div>', unsafe_allow_html=True)
     
     for item in suggestions:
-        if item['level'] == "WARNING":
-            bg_color = "rgba(239, 68, 68, 0.1)"
-            border_color = "#EF4444"
+        if item['level'] == "DANGER":
+            bg_color = "rgba(220, 38, 38, 0.12)"
+            border_color = "#DC2626"
             text_color = "#991B1B"
+        elif item['level'] == "WARNING":
+            bg_color = "rgba(217, 119, 6, 0.12)"
+            border_color = "#D97706"
+            text_color = "#92400E"
         elif item['level'] == "SUCCESS":
-            bg_color = "rgba(15, 118, 110, 0.1)"
+            bg_color = "rgba(15, 118, 110, 0.12)"
             border_color = "#0F766E"
             text_color = "#0F766E"
-        else:
-            bg_color = "rgba(59, 130, 246, 0.1)"
-            border_color = "#3B82F6"
+        else: # INFO
+            bg_color = "rgba(37, 99, 235, 0.12)"
+            border_color = "#2563EB"
             text_color = "#1E40AF"
 
         st.markdown(f"""
-        <div style="background-color: {bg_color}; border-left: 4px solid {border_color}; padding: 14px 18px; border-radius: 8px; margin-bottom: 12px;">
+        <div style="background-color: {bg_color}; border-left: 5px solid {border_color}; padding: 14px 18px; border-radius: 8px; margin-bottom: 12px;">
             <div style="font-size: 0.95rem; font-weight: 700; color: {text_color}; margin-bottom: 4px;">
                 {item['title']}
             </div>
-            <div style="font-size: 0.88rem; opacity: 0.9; line-height: 1.5;">
+            <div style="font-size: 0.88rem; opacity: 0.92; line-height: 1.5; color: #1E293B;">
                 {item['desc']}
             </div>
         </div>
