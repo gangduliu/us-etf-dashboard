@@ -1,3 +1,4 @@
+import json
 import streamlit as st
 import yfinance as yf
 import pandas as pd
@@ -241,3 +242,51 @@ def get_portfolio_sector_breakdown(portfolio_df, market_data):
 
     res_df = pd.DataFrame(list(sector_weights.items()), columns=['Sector', 'Weight'])
     return res_df.sort_values(by='Weight', ascending=False)
+
+
+def export_portfolio_to_json(df: pd.DataFrame) -> str:
+    """将持仓 DataFrame 转换为 JSON 格式字符串供下载"""
+    valid_df = df.dropna(subset=['ticker'])
+    records = valid_df.to_dict(orient="records")
+    return json.dumps(records, ensure_ascii=False, indent=2)
+
+
+def export_portfolio_to_csv(df: pd.DataFrame) -> str:
+    """将持仓 DataFrame 转换为 CSV 格式字符串供下载"""
+    valid_df = df.dropna(subset=['ticker'])
+    return valid_df.to_csv(index=False, encoding='utf-8-sig')
+
+
+def load_portfolio_from_file(uploaded_file) -> pd.DataFrame:
+    """从用户上传的 CSV 或 JSON 文件解析并重建持仓 DataFrame"""
+    filename = uploaded_file.name.lower()
+    
+    try:
+        if filename.endswith(".json"):
+            data = json.load(uploaded_file)
+            df = pd.DataFrame(data)
+        elif filename.endswith(".csv"):
+            df = pd.read_csv(uploaded_file)
+        else:
+            st.error("❌ 不支持的文件格式，请上传 .json 或 .csv 文件！")
+            return None # type: ignore
+            
+        # 验证必要的列是否存在
+        required_cols = {'ticker', 'shares', 'cost_price'}
+        if not required_cols.issubset(set(df.columns)):
+            st.error("❌ 格式不匹配：文件缺少必要字段 (ticker, shares, cost_price)")
+            return None # type: ignore
+            
+        # 确保数据类型正确
+        df['ticker'] = df['ticker'].astype(str).str.strip().str.upper()
+        df['shares'] = pd.to_numeric(df['shares'], errors='coerce').fillna(1.0)
+        df['cost_price'] = pd.to_numeric(df['cost_price'], errors='coerce').fillna(0.0)
+        if 'target_pct' in df.columns:
+            df['target_pct'] = pd.to_numeric(df['target_pct'], errors='coerce').fillna(0.0)
+        else:
+            df['target_pct'] = 0.0
+
+        return df.dropna(subset=['ticker'])
+    except Exception as e:
+        st.error(f"❌ 读取持仓文件失败: {e}")
+        return None # type: ignore

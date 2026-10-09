@@ -14,7 +14,8 @@ from data import (
     load_stock_or_etf_data, load_etf_holdings_and_sectors, 
     load_all_historical_returns, filter_by_range, calculate_ttm_dividend_yield,
     get_asset_size_or_market_cap, get_range_years_limit,
-    load_portfolio_market_data, get_portfolio_sector_breakdown
+    load_portfolio_market_data, get_portfolio_sector_breakdown,
+    load_portfolio_from_file, export_portfolio_to_json, export_portfolio_to_csv
 )
 from strategy import (
     analyze_trading_signal, calculate_portfolio_metrics,
@@ -309,6 +310,28 @@ with tab4:
         st.error(f"加载对比数据失败: {e}")
 
 
+# 1. 初始化文件上传框的动态 Key 计数器
+if "uploader_key_id" not in st.session_state:
+  st.session_state.uploader_key_id = 0
+
+
+# 2. 定义回调处理函数
+def handle_file_upload():
+  # 获取当前时刻上传框的 dynamic key
+  current_key = f"portfolio_file_uploader_{st.session_state.uploader_key_id}"
+  uploaded_file = st.session_state.get(current_key)
+
+  if uploaded_file is not None:
+    new_df = load_portfolio_from_file(uploaded_file)
+    if new_df is not None and not new_df.empty:
+      # 更新持仓数据
+      st.session_state.portfolio_data = new_df
+      st.toast("✅ 持仓数据导入成功，上传框已重置！", icon="🎉")
+
+      # 👈 Key 自增 1，下一次渲染时会自动生成一个新的空白上传框
+      st.session_state.uploader_key_id += 1
+
+
 # Tab 5: 投资组合管理 & 再平衡计算器
 with tab5:
     st.markdown('<div class="section-title">💼 我的投资组合配置与实盘跟踪</div>', unsafe_allow_html=True)
@@ -321,9 +344,64 @@ with tab5:
             {"ticker": "SCHD", "shares": 20.0, "cost_price": 30.0, "target_pct": 20.0}
         ])
 
-    # 2. 可收起式持仓与目标权重编辑器
-    with st.expander("✏️ 编辑持仓明细与目标配置权重（点击展开/折叠）", expanded=False):
-        st.caption("设定各标的的【目标权重 (%)】，系统将自动生成偏离度分析与买卖调仓指令：")
+    # 持仓明细编辑与文件备份/恢复面板
+    with st.expander("✏️ 编辑持仓明细与目标配置 (支持 CSV/JSON 备份导入)", expanded=False):
+
+        col_up, col_dl_json, col_dl_csv = st.columns([1.4, 1, 1], gap="medium")
+
+        # 📥 1.1 文件导入（恢复）
+        with col_up:
+            dynamic_uploader_key = (
+                f"portfolio_file_uploader_{st.session_state.uploader_key_id}"
+            )
+            st.file_uploader(
+                "📤 恢复持仓备份 (.csv / .json)",
+                type=["json", "csv"],
+                key=dynamic_uploader_key,
+                on_change=handle_file_upload,
+                help="选择本地备份的 JSON 或 CSV 持仓文件，导入后将自动清空此框并恢复数据",
+                label_visibility="visible",
+            )
+
+        # 📤 1.2 导出 JSON (结构化备份)
+        with col_dl_json:
+            st.markdown(
+                '<label style="font-size: 0.88rem; opacity: 0.8; font-weight: 500;'
+                ' display: block; margin-bottom: 8px;">💾 结构化备份</label>',
+                unsafe_allow_html=True,
+            )
+            json_str = export_portfolio_to_json(st.session_state.portfolio_data)
+            st.download_button(
+                label="下载 JSON 备份",
+                data=json_str,
+                file_name="portfolio_backup.json",
+                mime="application/json",
+                use_container_width=True,
+                help="推荐：格式完全无损，包含所有持仓与目标配置权重",
+            )
+
+        # 📤 1.3 导出 CSV (Excel 可读)
+        with col_dl_csv:
+            st.markdown(
+                '<label style="font-size: 0.88rem; opacity: 0.8; font-weight: 500;'
+                ' display: block; margin-bottom: 8px;">📊 表格兼容备份</label>',
+                unsafe_allow_html=True,
+            )
+            csv_str = export_portfolio_to_csv(st.session_state.portfolio_data)
+            st.download_button(
+                label="导出 CSV (Excel)",
+                data=csv_str,
+                file_name="portfolio_backup.csv",
+                mime="text/csv",
+                use_container_width=True,
+                help="适合用 Excel 或 Numbers 批量修改持股数与成本价后重新导入",
+            )
+
+        # 结束包裹容器
+        st.markdown("</div>", unsafe_allow_html=True)
+
+        # 2. 交互式持仓数据在线编辑器
+        st.caption("直接在下方表格修改持股数与成本价，修改后可随时通过上方按钮备份到本地：")
         edited_portfolio = st.data_editor(
             st.session_state.portfolio_data,
             column_config={
