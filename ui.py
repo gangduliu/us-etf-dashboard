@@ -435,7 +435,7 @@ def render_dividend_dashboard(div_metrics):
             div_metrics['monthly_df'],
             x="月份",
             y="预计领息 ($)",
-            text_auto=".0f", # type: ignore
+            text_auto=".2f", # type: ignore
             template="plotly"
         )
         fig_div_bar.update_traces(

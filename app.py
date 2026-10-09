@@ -329,7 +329,7 @@ with tab5:
             column_config={
                 "ticker": st.column_config.TextColumn("代码 (Ticker)", required=True, width="small"),
                 "shares": st.column_config.NumberColumn("持股数", min_value=0.01, step=1.0, format="%.2f"),
-                "cost_price": st.column_config.NumberColumn("成本单价 ($)", min_value=0.01, step=1.0, format="$%.2f"),
+                "cost_price": st.column_config.NumberColumn("成本单价 ($)", min_value=0.01, step=0.01, format="$%.2f"),
                 "target_pct": st.column_config.NumberColumn("目标权重 (%)", min_value=0.0, max_value=100.0, step=5.0, format="%.1f%%")
             },
             num_rows="dynamic",
