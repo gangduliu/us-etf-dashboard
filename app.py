@@ -310,10 +310,21 @@ with tab4:
         st.error(f"加载对比数据失败: {e}")
 
 
-# 1. 初始化文件上传框的动态 Key 计数器
+# 全局初始化 Session State 默认持仓与 Key 计数器
+DEFAULT_PORTFOLIO = pd.DataFrame([
+    {"ticker": "VOO", "shares": 5.0, "cost_price": 700.0, "target_pct": 60.0},
+    {"ticker": "VGT", "shares": 6.0, "cost_price": 120.0, "target_pct": 20.0},
+        {"ticker": "SCHD", "shares": 20.0, "cost_price": 30.0, "target_pct": 20.0}
+])
+
+if "portfolio_data" not in st.session_state:
+  st.session_state.portfolio_data = DEFAULT_PORTFOLIO.copy()
+
 if "uploader_key_id" not in st.session_state:
   st.session_state.uploader_key_id = 0
 
+if "editor_key_id" not in st.session_state:
+  st.session_state.editor_key_id = 0
 
 # 2. 定义回调处理函数
 def handle_file_upload():
@@ -328,26 +339,24 @@ def handle_file_upload():
       st.session_state.portfolio_data = new_df
       st.toast("✅ 持仓数据导入成功，上传框已重置！", icon="🎉")
 
-      # 👈 Key 自增 1，下一次渲染时会自动生成一个新的空白上传框
+      # Key 自增 1，下一次渲染时会自动生成一个新的空白上传框
       st.session_state.uploader_key_id += 1
 
 
 # Tab 5: 投资组合管理 & 再平衡计算器
 with tab5:
     st.markdown('<div class="section-title">💼 我的投资组合配置与实盘跟踪</div>', unsafe_allow_html=True)
-    
-    # 1. 初始化持仓数据 (加入 target_pct 目标权重列)
-    if "portfolio_data" not in st.session_state:
-        st.session_state.portfolio_data = pd.DataFrame([
-            {"ticker": "VOO", "shares": 5.0, "cost_price": 700.0, "target_pct": 60.0},
-            {"ticker": "VGT", "shares": 6.0, "cost_price": 120.0, "target_pct": 20.0},
-            {"ticker": "SCHD", "shares": 20.0, "cost_price": 30.0, "target_pct": 20.0}
-        ])
 
     # 持仓明细编辑与文件备份/恢复面板
-    with st.expander("✏️ 编辑持仓明细与目标配置 (支持 CSV/JSON 备份导入)", expanded=False):
+    with st.expander("✏️ 编辑持仓明细与目标配置 (支持备份导入与一键重置)", expanded=False):
+        # 工具栏标题
+        st.markdown(
+            '🔄 **持仓配置数据管理与恢复** &nbsp;|&nbsp; <span'
+            ' style="font-size:0.85rem; opacity:0.7;">Data Transfer Toolbar</span>',
+            unsafe_allow_html=True,
+        )
 
-        col_up, col_dl_json, col_dl_csv = st.columns([1.4, 1, 1], gap="medium")
+        col_up, col_dl_json, col_dl_csv, col_reset = st.columns([1.3, 0.9, 0.9, 0.9], gap="medium")
 
         # 📥 1.1 文件导入（恢复）
         with col_up:
@@ -394,14 +403,35 @@ with tab5:
                 file_name="portfolio_backup.csv",
                 mime="text/csv",
                 use_container_width=True,
-                help="适合用 Excel 或 Numbers 批量修改持股数与成本价后重新导入",
+                help="适合用 Excel 批量修改持股数与成本价后重新导入",
             )
 
-        # 结束包裹容器
+        # 🔄 1.4 一键重置为默认持仓按钮
+        with col_reset:
+            st.markdown(
+                '<label style="font-size: 0.88rem; opacity: 0.8; font-weight: 500;'
+                ' display: block; margin-bottom: 8px;">⚠️ 恢复初始状态</label>',
+                unsafe_allow_html=True,
+            )
+            if st.button(
+                "🔄 重置默认持仓",
+                use_container_width=True,
+                help="点击后将清空当前表格，恢复为默认的 VOO/VGT/SCHD 示例持仓",
+            ):
+                # 重置数据
+                st.session_state.portfolio_data = DEFAULT_PORTFOLIO.copy()
+                # 强制更新编辑器 key，让表格组件彻底重新渲染
+                st.session_state.editor_key_id += 1
+                st.toast("🔄 已成功恢复为默认示例持仓！", icon="💡")
+
         st.markdown("</div>", unsafe_allow_html=True)
 
         # 2. 交互式持仓数据在线编辑器
         st.caption("直接在下方表格修改持股数与成本价，修改后可随时通过上方按钮备份到本地：")
+
+        # 动态拼接 data_editor 的 key，确保重置时表格能同步刷新
+        dynamic_editor_key = f"portfolio_editor_{st.session_state.editor_key_id}"
+
         edited_portfolio = st.data_editor(
             st.session_state.portfolio_data,
             column_config={
@@ -412,7 +442,7 @@ with tab5:
             },
             num_rows="dynamic",
             use_container_width=True,
-            key="portfolio_editor"
+            key=dynamic_editor_key
         )
         st.session_state.portfolio_data = edited_portfolio
 
