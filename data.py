@@ -19,6 +19,16 @@ def load_stock_or_etf_data(ticker_symbol):
     # 2. 基本信息字典
     info_raw = ticker.info or {}
     info = {k: v for k, v in info_raw.items() if isinstance(v, (int, float, str, bool, list, dict))}
+
+    #提取管理费率 (依次尝试多个可能存在的 key)
+    raw_expense_ratio = (
+        info.get('expenseRatio') or 
+        info.get('netExpenseRatio') or 
+        info.get('annualReportExpenseRatio') or 
+        0.0
+    )
+
+    info['expenseRatio'] = raw_expense_ratio  # type: ignore
     
     # 3. 历史分红记录
     dividends = ticker.dividends
