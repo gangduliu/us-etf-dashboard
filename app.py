@@ -59,11 +59,12 @@ with st.sidebar:
         
     # 代码文本输入框 (自动绑定快捷按钮的选择)
     user_ticker = st.text_input(
-        "输入任意美股/ETF代码 (如: TSLA, MSFT, BRK-B)",
+        "输入任意美股/ETF代码 (如: TSLA, MSFT)",
         value=st.session_state.ticker_input
     ).strip().upper()
     
     st.divider()
+
     st.markdown("### ⚙️ 看板配置")
     time_range = st.selectbox(
         "时间跨度筛选",
@@ -108,7 +109,7 @@ tab1, tab2, tab3, tab4, tab5 = st.tabs([
     tab2_title, 
     "💰 历史回报与分红", 
     "⚔️ 热门美股/ETF 走势对比",
-    "💼 投资组合管理" # <--- 新增 Tab
+    "💼 投资组合管理"
 ])
 
 # Tab 1: 走势与量化决策
@@ -160,16 +161,26 @@ with tab1:
             total_balance += monthly_invest * ((1 + monthly_rate) ** (months - m))
         profit = total_balance - total_principal
 
-        st.markdown(f"""
-        <div style="background-color: rgba(15, 118, 110, 0.1); border: 1px solid rgba(15, 118, 110, 0.3); padding: 16px; border-radius: 10px; margin-top: 10px;">
-            <div style="font-size: 0.85rem; color: #0F766E; font-weight: 600;">预估期末资产 ({invest_years}年后)</div>
-            <div style="font-size: 1.8rem; font-weight: 700; color: #0F766E; margin: 4px 0;">${total_balance:,.0f}</div>
-            <div style="font-size: 0.85rem; opacity: 0.85;">
-                累计本金: <b>${total_principal:,.0f}</b><br>
-                预计纯收益: <b>${profit:,.0f}</b> (+{(profit/total_principal)*100:.1f}%)
+        st.markdown(
+            f"""
+            <div style="
+                background-color: var(--background-secondary, rgba(15, 118, 110, 0.08)); 
+                border: 1px solid var(--border-color, rgba(15, 118, 110, 0.3)); 
+                padding: 18px; 
+                border-radius: 10px; 
+                margin-top: 10px;
+                color: var(--text-color);
+            ">
+                <div style="font-size: 0.85rem; opacity: 0.8; font-weight: 600;">预估期末资产 ({invest_years}年后)</div>
+                <div style="font-size: 1.8rem; font-weight: 700; margin: 6px 0;">${total_balance:,.0f}</div>
+                <div style="font-size: 0.85rem; opacity: 0.85;">
+                    累计本金: <b>${total_principal:,.0f}</b><br>
+                    预计纯收益: <b>${profit:,.0f}</b> (+{(profit/total_principal)*100:.1f}%)
+                </div>
             </div>
-        </div>
-        """, unsafe_allow_html=True)
+            """,
+            unsafe_allow_html=True,
+        )
 
 # Tab 2: 智能判断 (ETF 显示持仓/行业，个股显示基本面指标)
 with tab2:
@@ -426,7 +437,7 @@ with tab5:
 
         st.markdown("</div>", unsafe_allow_html=True)
 
-        # 2. 交互式持仓数据在线编辑器
+        # 交互式持仓数据在线编辑器
         st.caption("直接在下方表格修改持股数与成本价，修改后可随时通过上方按钮备份到本地：")
 
         # 动态拼接 data_editor 的 key，确保重置时表格能同步刷新
@@ -446,7 +457,7 @@ with tab5:
         )
         st.session_state.portfolio_data = edited_portfolio
 
-    # 3. 核心计算与数据准备
+    # 核心计算与数据准备
     valid_portfolio = st.session_state.portfolio_data.dropna()
     
     if not valid_portfolio.empty:
@@ -455,15 +466,43 @@ with tab5:
         p_metrics = calculate_portfolio_metrics(valid_portfolio, market_data)
         sector_p_df = get_portfolio_sector_breakdown(valid_portfolio, market_data)
 
-        # 4. 顶部核心概览 KPI 卡片
+        # 顶部核心概览 KPI 卡片
         render_portfolio_summary_cards(p_metrics)
         
-        # 5. 中层图表分析 (宽屏排版，不挡图例)
+        # 中层图表分析 (宽屏排版，不挡图例)
         render_portfolio_charts(p_metrics, sector_p_df)
         
         st.divider()
 
-        # 6. 新增：一键再平衡计算器模块 (结合新资金 DCA)
+        # 组合健康诊断
+        suggestions = analyze_portfolio_health(valid_portfolio, market_data, sector_p_df)
+        render_portfolio_advisory(suggestions)
+        
+        st.divider()
+
+        # 持仓盈亏明细表格
+        st.markdown('<div class="section-title">📋 持仓资产盈亏明细表</div>', unsafe_allow_html=True)
+        st.dataframe(
+            p_metrics['details_df'],
+            column_config={
+                "代码": st.column_config.TextColumn("代码", width="small"),
+                "名称": st.column_config.TextColumn("名称", width="large"),
+                "持仓股数": st.column_config.NumberColumn("持股数", format="%.2f"),
+                "持仓成本价 ($)": st.column_config.NumberColumn("成本价", format="$%.2f"),
+                "当前现价 ($)": st.column_config.NumberColumn("当前现价", format="$%.2f"),
+                "当前总市值 ($)": st.column_config.NumberColumn("总市值", format="$%.2f"),
+                "持仓成本总额 ($)": st.column_config.NumberColumn("成本总额", format="$%.2f"),
+                "累计盈亏 ($)": st.column_config.NumberColumn("累计盈亏", format="$%.2f"),
+                "累计收益率 (%)": st.column_config.NumberColumn("收益率", format="%.2f%%"),
+                "当日盈亏 ($)": st.column_config.NumberColumn("当日盈亏", format="$%.2f")
+            },
+            hide_index=True,
+            use_container_width=True
+        )
+
+        st.divider()
+
+        # 一键再平衡计算器模块 (结合新资金 DCA)
         col_rebal_title, col_cash_input = st.columns([2, 1])
         with col_rebal_title:
             st.write("")
@@ -489,36 +528,8 @@ with tab5:
         # 计算并渲染 股息现金流预估看板
         div_metrics = calculate_portfolio_dividends(valid_portfolio, market_data, raw_dividends_dict)
         render_dividend_dashboard(div_metrics)
-
-        st.divider()
-
-        # 7. 组合健康诊断
-        suggestions = analyze_portfolio_health(valid_portfolio, market_data, sector_p_df)
-        render_portfolio_advisory(suggestions)
-        
-        st.divider()
-
-        # 8. 底层持仓盈亏明细表格
-        st.markdown('<div class="section-title">📋 持仓资产盈亏明细表</div>', unsafe_allow_html=True)
-        st.dataframe(
-            p_metrics['details_df'],
-            column_config={
-                "代码": st.column_config.TextColumn("代码", width="small"),
-                "名称": st.column_config.TextColumn("名称", width="large"),
-                "持仓股数": st.column_config.NumberColumn("持股数", format="%.2f"),
-                "持仓成本价 ($)": st.column_config.NumberColumn("成本价", format="$%.2f"),
-                "当前现价 ($)": st.column_config.NumberColumn("当前现价", format="$%.2f"),
-                "当前总市值 ($)": st.column_config.NumberColumn("总市值", format="$%.2f"),
-                "持仓成本总额 ($)": st.column_config.NumberColumn("成本总额", format="$%.2f"),
-                "累计盈亏 ($)": st.column_config.NumberColumn("累计盈亏", format="$%.2f"),
-                "累计收益率 (%)": st.column_config.NumberColumn("收益率", format="%.2f%%"),
-                "当日盈亏 ($)": st.column_config.NumberColumn("当日盈亏", format="$%.2f")
-            },
-            hide_index=True,
-            use_container_width=True
-        )
     else:
-        st.info("💡 请展开上方编辑面板，添加至少一只持仓标的。")
+            st.info("💡 请展开上方编辑面板，添加至少一只持仓标的。")
 
 # 全局页脚
 st.divider()

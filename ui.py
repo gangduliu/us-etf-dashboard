@@ -76,24 +76,46 @@ def inject_custom_css():
             letter-spacing: -0.02em;
         }}
 
+        /* Tab 列表容器：现代胶囊底座，自适应深浅色背景与边框 */
         .stTabs [data-baseweb="tab-list"] {{
             gap: 8px;
-            background-color: rgba(125, 125, 125, 0.08);
+            background-color: var(--secondary-background-color);
             padding: 6px;
-            border-radius: 10px;
+            border-radius: 12px;
+            border: 1px solid var(--border-color);
+            margin-bottom: 20px;
         }}
 
+        /* 单个 Tab 按钮：加入 0.25 秒贝塞尔平滑过渡，告别硬切 */
         .stTabs [data-baseweb="tab"] {{
             height: 40px;
-            border-radius: 6px;
-            font-weight: 600;
-            font-size: 0.9rem;
+            border-radius: 8px !important;
+            color: var(--text-color) !important;
+            font-weight: 500 !important;
+            font-size: 0.9rem !important;
+            transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
             border: none !important;
+            background-color: transparent !important;
+            padding: 0 16px !important;
         }}
 
-        .stTabs [aria-selected="true"] {{
-            background-color: {PRIMARY_COLOR} !important;
+        /* 3. 鼠标悬停平滑泛起淡淡的青绿微光与文字变色 */
+        .stTabs [data-baseweb="tab"]:hover {{
+            background-color: rgba(15, 118, 110, 0.08) !important;
+            color: var(--primary-color) !important;
+        }}
+
+        /* 4. 选中状态丝滑填充主色调、加入细腻的立体阴影 */
+        .stTabs [data-baseweb="tab"][aria-selected="true"] {{
+            background-color: var(--primary-color) !important;
             color: #FFFFFF !important;
+            font-weight: 600 !important;
+            box-shadow: 0 4px 12px rgba(15, 118, 110, 0.25);
+        }}
+
+        /* 5. 彻底隐藏 Baseweb 默认生硬的底部横线指示条 */
+        .stTabs [data-baseweb="tab-highlight"] {{
+            display: none !important;
         }}
         
         .section-title {{
@@ -335,8 +357,8 @@ def render_portfolio_charts(p_metrics, sector_p_df):
 
 
 def render_portfolio_advisory(suggestions):
-    """渲染投资组合健康诊断与建议 (完美兼容 Dark Mode / Light Mode 高对比度)"""
-    st.markdown('<div class="section-title">💡 投资组合健康诊断与优化建议 (风格区分版)</div>', unsafe_allow_html=True)
+    """渲染投资组合健康诊断与建议"""
+    st.markdown('<div class="section-title">💡 投资组合健康诊断与优化建议</div>', unsafe_allow_html=True)
     
     for item in suggestions:
         if item['level'] == "DANGER":
@@ -426,47 +448,42 @@ def render_dividend_dashboard(div_metrics):
 
     st.markdown("<br>", unsafe_allow_html=True)
     
-    col_chart, col_table = st.columns([1.3, 1])
-    
-    # 左侧：月度现金流预估柱状图
-    with col_chart:
-        st.markdown("##### 📅 预估未来 12 个月领息日历 ($)")
-        fig_div_bar = px.bar(
-            div_metrics['monthly_df'],
-            x="月份",
-            y="预计领息 ($)",
-            text_auto=".2f", # type: ignore
-            template="plotly"
-        )
-        fig_div_bar.update_traces(
-            marker_color="#0F766E",
-            textposition="outside"
-        )
-        fig_div_bar.update_layout(
-            height=320,
-            margin=dict(l=10, r=10, t=20, b=10),
-            xaxis_title="",
-            yaxis_title="",
-            paper_bgcolor='rgba(0,0,0,0)',
-            plot_bgcolor='rgba(0,0,0,0)',
-            xaxis=dict(showgrid=False),
-            yaxis=dict(showgrid=True)
-        )
-        st.plotly_chart(fig_div_bar, use_container_width=True)
+    # 月度现金流预估柱状图
+    st.markdown("##### 📅 预估未来 12 个月领息日历 ($)")
+    fig_div_bar = px.bar(
+        div_metrics['monthly_df'],
+        x="月份",
+        y="预计领息 ($)",
+        text_auto=".2f", # type: ignore
+        template="plotly"
+    )
+    fig_div_bar.update_traces(
+        marker_color="#0F766E",
+        textposition="outside"
+    )
+    fig_div_bar.update_layout(
+        height=320,
+        margin=dict(l=10, r=10, t=20, b=10),
+        xaxis_title="",
+        yaxis_title="",
+        paper_bgcolor='rgba(0,0,0,0)',
+        plot_bgcolor='rgba(0,0,0,0)',
+        xaxis=dict(showgrid=False),
+        yaxis=dict(showgrid=True)
+    )
+    st.plotly_chart(fig_div_bar, use_container_width=True)
 
-    # 右侧：各标的派息明细表
-    with col_table:
-        st.markdown("##### 📋 各标的股息贡献明细")
-        st.dataframe(
-            div_metrics['breakdown_df'],
-            column_config={
-                "代码": st.column_config.TextColumn("代码", width="small"),
-                "当前持仓市值 ($)": st.column_config.NumberColumn("持仓市值", format="$%.2f"),
-                "股息率 (TTM %)": st.column_config.NumberColumn("股息率", format="%.2f%%"),
-                "预计年领股息 ($)": st.column_config.NumberColumn("预计年股息", format="$%.2f"),
-                "历史派息月份": st.column_config.TextColumn("派息月份", width="medium")
-            },
-            hide_index=True,
-            use_container_width=True,
-            height=320
-        )
+    # 各标的派息明细表
+    st.markdown("##### 📋 各标的股息贡献明细")
+    st.dataframe(
+        div_metrics['breakdown_df'],
+        column_config={
+            "代码": st.column_config.TextColumn("代码", width="small"),
+            "当前持仓市值 ($)": st.column_config.NumberColumn("持仓市值", format="$%.2f"),
+            "股息率 (TTM %)": st.column_config.NumberColumn("股息率", format="%.2f%%"),
+            "预计年领股息 ($)": st.column_config.NumberColumn("预计年股息", format="$%.2f"),
+            "历史派息月份": st.column_config.TextColumn("派息月份", width="medium")
+        },
+        hide_index=True,
+        use_container_width=True,
+    )
