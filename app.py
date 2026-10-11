@@ -438,7 +438,7 @@ with tab5:
         st.markdown("</div>", unsafe_allow_html=True)
 
         # 交互式持仓数据在线编辑器
-        st.caption("直接在下方表格修改持股数与成本价，修改后可随时通过上方按钮备份到本地：")
+        st.caption("直接在下方表格修改持股数、成本价与目标权重，修改后可随时通过上方按钮备份到本地：")
 
         # 动态拼接 data_editor 的 key，确保重置时表格能同步刷新
         dynamic_editor_key = f"portfolio_editor_{st.session_state.editor_key_id}"
