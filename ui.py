@@ -223,7 +223,7 @@ def render_advice_card(advice):
 
 def render_comparison_chart(df_compare, time_range):
     title_text = "全历史" if time_range == "Max" else f"近 {time_range}"
-    st.markdown(f'<div class="section-title">⚔️ 热门美股 / ETF {title_text}累计收益率比拼 (%)</div>', unsafe_allow_html=True)
+    st.markdown(f'<div class="section-title">⚔️ 热门美股 / ETF {title_text} 累计收益率比拼 (%)</div>', unsafe_allow_html=True)
     
     fig = px.line(
         df_compare, 

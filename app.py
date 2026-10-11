@@ -468,17 +468,13 @@ with tab5:
 
         # 顶部核心概览 KPI 卡片
         render_portfolio_summary_cards(p_metrics)
-        
-        # 中层图表分析 (宽屏排版，不挡图例)
-        render_portfolio_charts(p_metrics, sector_p_df)
-        
-        st.divider()
 
         # 组合健康诊断
         suggestions = analyze_portfolio_health(valid_portfolio, market_data, sector_p_df)
         render_portfolio_advisory(suggestions)
         
-        st.divider()
+        # 图表分析
+        render_portfolio_charts(p_metrics, sector_p_df)
 
         # 持仓盈亏明细表格
         st.markdown('<div class="section-title">📋 持仓资产盈亏明细表</div>', unsafe_allow_html=True)
