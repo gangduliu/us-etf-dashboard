@@ -144,6 +144,7 @@ def calculate_portfolio_metrics(portfolio_df, market_data):
     """计算投资组合的总资产、总成本、累计浮盈浮亏及当日盈亏"""
     total_cost = 0.0
     total_market_value = 0.0
+    total_prev_value = 0.0
     daily_gain_loss = 0.0
     
     detailed_rows = []
@@ -159,13 +160,16 @@ def calculate_portfolio_metrics(portfolio_df, market_data):
         
         pos_cost = shares * cost_price
         pos_value = shares * latest_price
+        pos_prev = shares * prev_price
         pos_profit = pos_value - pos_cost
         pos_profit_pct = (pos_profit / pos_cost * 100) if pos_cost > 0 else 0
         
         pos_daily = shares * (latest_price - prev_price)
+        pos_daily_pct = (pos_daily / pos_prev * 100) if pos_prev > 0 else 0
         
         total_cost += pos_cost
         total_market_value += pos_value
+        total_prev_value += pos_prev
         daily_gain_loss += pos_daily
         
         detailed_rows.append({
@@ -178,18 +182,21 @@ def calculate_portfolio_metrics(portfolio_df, market_data):
             "持仓成本总额 ($)": pos_cost,
             "累计盈亏 ($)": pos_profit,
             "累计收益率 (%)": pos_profit_pct,
-            "当日盈亏 ($)": pos_daily
+            "当日盈亏 ($)": pos_daily,
+            "当日收益率 (%)": pos_daily_pct
         })
 
     total_profit = total_market_value - total_cost
     total_profit_pct = (total_profit / total_cost * 100) if total_cost > 0 else 0
-    
+    daily_gain_loss_pct = (daily_gain_loss / total_prev_value * 100) if total_prev_value > 0 else 0
+
     return {
         "total_cost": total_cost,
         "total_market_value": total_market_value,
         "total_profit": total_profit,
         "total_profit_pct": total_profit_pct,
         "daily_gain_loss": daily_gain_loss,
+        "daily_gain_loss_pct": daily_gain_loss_pct,
         "details_df": pd.DataFrame(detailed_rows)
     }
 

@@ -489,8 +489,9 @@ with tab5:
                 "当前总市值 ($)": st.column_config.NumberColumn("总市值", format="$%.2f"),
                 "持仓成本总额 ($)": st.column_config.NumberColumn("成本总额", format="$%.2f"),
                 "累计盈亏 ($)": st.column_config.NumberColumn("累计盈亏", format="$%.2f"),
-                "累计收益率 (%)": st.column_config.NumberColumn("收益率", format="%.2f%%"),
-                "当日盈亏 ($)": st.column_config.NumberColumn("当日盈亏", format="$%.2f")
+                "累计收益率 (%)": st.column_config.NumberColumn("累计收益率", format="%.2f%%"),
+                "当日盈亏 ($)": st.column_config.NumberColumn("当日盈亏", format="$%.2f"),
+                "当日收益率 (%)": st.column_config.NumberColumn("当日收益率", format="%.2f%%")
             },
             hide_index=True,
             use_container_width=True

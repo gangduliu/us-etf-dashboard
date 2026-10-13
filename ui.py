@@ -261,15 +261,13 @@ def render_portfolio_summary_cards(p_metrics):
         label="累计浮盈 / 浮亏",
         value=f"${p_metrics['total_profit']:+,.2f}",
         delta=f"{p_metrics['total_profit_pct']:+.2f}%",
-        delta_color=profit_color
     )
     
     daily_color = "normal" if p_metrics['daily_gain_loss'] >= 0 else "inverse"
     col3.metric(
         label="预估当日盈亏",
         value=f"${p_metrics['daily_gain_loss']:+,.2f}",
-        delta="较前一交易日收盘",
-        delta_color=daily_color
+        delta=f"{p_metrics['daily_gain_loss_pct']:+.2f}%",
     )
     
     pos_count = len(p_metrics['details_df'])

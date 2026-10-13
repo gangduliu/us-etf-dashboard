@@ -215,8 +215,8 @@ def load_portfolio_market_data(tickers):
             ticker = yf.Ticker(t)
             hist = ticker.history(period="5d")
             if not hist.empty:
-                latest_price = float(hist['Close'].iloc[-1])
-                prev_price = float(hist['Close'].iloc[-2]) if len(hist) > 1 else latest_price
+                latest_price = hist['Close'].iloc[-1]
+                prev_price = hist['Close'].iloc[-2] if len(hist) > 1 else latest_price
                 
                 info = ticker.info or {}
                 dividends = ticker.dividends
