@@ -4,6 +4,31 @@ import yfinance as yf
 import pandas as pd
 from datetime import datetime, timedelta
 
+
+def check_is_etf(ticker_symbol, info):
+    """
+    更稳健的 ETF 判断函数，包含多重兜底逻辑
+    """
+    ticker_symbol = ticker_symbol.upper().strip()
+    
+    # 1. 核心白名单兜底（防止云端 IP 被 Yahoo 屏蔽导致 info 为空时，主流 ETF 漏判）
+    known_etfs = {
+        'VOO', 'SPY', 'QQQ', 'IVV', 'VTI', 'VEA', 'VWO', 'AGG', 'BND', 
+        'GLD', 'IAU', 'IWM', 'EEM', 'VNQ', 'SCHD', 'ARKK', 'XLK', 'XLF'
+    }
+    if ticker_symbol in known_etfs:
+        return True
+
+    # 2. 正常通过 info 字典判断
+    if info and isinstance(info, dict) and len(info) > 1:
+        quote_type = info.get('quoteType', '')
+        fund_family = info.get('fundFamily')
+        
+        return quote_type == 'ETF' or fund_family is not None
+    
+    return True
+
+
 @st.cache_data(ttl=3600)
 def load_stock_or_etf_data(ticker_symbol):
     """通用获取任意美股/ETF 的历史价格、info 字典以及分红数据"""
@@ -36,7 +61,7 @@ def load_stock_or_etf_data(ticker_symbol):
         dividends.index = dividends.index.tz_localize(None) # type: ignore
         
     # 判断是否为 ETF
-    is_etf = info.get('quoteType') == 'ETF' or info.get('fundFamily') is not None
+    is_etf = check_is_etf(ticker_symbol, info)
     
     return hist, info, dividends, is_etf
 
@@ -71,7 +96,7 @@ def load_etf_holdings_and_sectors(ticker_symbol):
 
 
 @st.cache_data(ttl=3600)
-def load_all_historical_returns(tickers=["VOO", "QQQ", "AAPL", "NVDA"]):
+def load_all_historical_returns(tickers=["VOO", "VGT", "SCHD"]):
     """获取指定代码组的原始收盘价数据 (供对比页使用)"""
     df_combined = pd.DataFrame()
     for t in tickers:
