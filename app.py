@@ -325,7 +325,7 @@ with tab4:
 DEFAULT_PORTFOLIO = pd.DataFrame([
     {"ticker": "VOO", "shares": 5.0, "cost_price": 700.0, "target_pct": 60.0},
     {"ticker": "VGT", "shares": 6.0, "cost_price": 120.0, "target_pct": 20.0},
-        {"ticker": "SCHD", "shares": 20.0, "cost_price": 30.0, "target_pct": 20.0}
+    {"ticker": "SCHD", "shares": 20.0, "cost_price": 30.0, "target_pct": 20.0}
 ])
 
 if "portfolio_data" not in st.session_state:

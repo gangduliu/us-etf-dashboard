@@ -16,7 +16,8 @@ def calculate_rsi(prices, period=14):
 def analyze_trading_signal(hist, latest_price, week_52_high, week_52_low, div_yield, ticker_symbol=""):
     """
     机构级多因子量化交易信号模型 (Multi-Factor Score)
-    综合考量：MA200乖离率、MA20/50均线趋势、RSI超买超卖、52周位置及布林带%B
+    综合考量: MA200乖离率、MA20/50均线趋势、RSI超买超卖、52周位置及布林带%B
+    新增：建议买入价与建议卖出价计算
     """
     if hist.empty or len(hist) < 20:
         return {
@@ -24,6 +25,8 @@ def analyze_trading_signal(hist, latest_price, week_52_high, week_52_low, div_yi
             "title": "🔵 数据不足 / 保持观察",
             "desc": "暂无足够历史数据计算量化信号。",
             "ma200": latest_price, "position_52w": 50.0, "ma_bias": 0.0, "rsi": 50.0,
+            "suggested_buy_price": round(latest_price * 0.95, 2),
+            "suggested_sell_price": round(latest_price * 1.05, 2),
             "badge_color": "#1E40AF", "badge_bg": "#DBEAFE", "score": 0
         }
 
@@ -50,6 +53,12 @@ def analyze_trading_signal(hist, latest_price, week_52_high, week_52_low, div_yi
     upper_band = ma20 + (2 * std20)
     lower_band = ma20 - (2 * std20)
     pct_b = ((latest_price - lower_band) / (upper_band - lower_band)) if (upper_band - lower_band) > 0 else 0.5
+
+    # 建议买入价：取布林带下轨、MA20 或当前价格下方合理支撑的较低者
+    suggested_buy_price = round(max(lower_band, min(latest_price * 0.96, ma20)), 2)
+    
+    # 建议卖出价（止盈/压力位）：取布林带上轨或合理溢价目标
+    suggested_sell_price = round(min(upper_band, max(latest_price * 1.06, ma20 * 1.05)), 2)
 
     # 2. 多因子打分逻辑 (Score range: -100 ~ +100)
     # 正分偏买入 (低估/支撑)，负分偏卖出/止盈 (过热/压力)
@@ -96,28 +105,24 @@ def analyze_trading_signal(hist, latest_price, week_52_high, week_52_low, div_yi
         signal_desc = f"价格跌破或贴近关键支撑区（MA200 乖离率 {ma200_bias:+.1f}%，RSI 为 {rsi:.1f}），布林带逼近下轨。历史概率显示当前具备极高风险收益比，建议分批加仓或分批建仓。"
         badge_color = "#166534"
         badge_bg = "#DCFCE7"
-
     elif score >= 10:
         signal_type = "BUY_WEAK"
         signal_title = f"🟢 分批定投 / 逢低适度关注 (综合评分: +{score})"
         signal_desc = f"指标整体处于合理或偏低估区间（RSI {rsi:.1f}），估值并未过热。适合常态化定投或分批小额买入。"
         badge_color = "#15803D"
         badge_bg = "#F0FDF4"
-
     elif score <= -35:
         signal_type = "SELL_STRONG"
         signal_title = f"🔴 强减仓 / 分批止盈提示 (综合评分: {score})"
         signal_desc = f"价格显著偏离 200 日均线（乖离率 {ma200_bias:+.1f}%），且 RSI ({rsi:.1f}) 处于极端超买区，触及布林上轨。短期回调风险剧增，建议分批锁定利润或通过资产再平衡降低仓位。"
         badge_color = "#991B1B"
         badge_bg = "#FEE2E2"
-
     elif score <= -10:
         signal_type = "SELL_WEAK"
         signal_title = f"🟡 阶段高位 / 暂停追高 (综合评分: {score})"
         signal_desc = f"价格接近 52 周高点（分位数 {position_52w:.1f}%），乖离率放宽。不建议此时大额追高，偏好稳健的投资者可暂停加仓或小幅再平衡。"
         badge_color = "#9A3412"
         badge_bg = "#FFEDD5"
-
     else:
         signal_type = "HOLD"
         signal_title = f"🔵 趋势健康 / 正常持有 (综合评分: {score:+} )"
@@ -135,6 +140,8 @@ def analyze_trading_signal(hist, latest_price, week_52_high, week_52_low, div_yi
         "ma_bias": ma200_bias,
         "rsi": rsi,
         "pct_b": pct_b * 100,
+        "suggested_buy_price": suggested_buy_price,
+        "suggested_sell_price": suggested_sell_price,
         "badge_color": badge_color,
         "badge_bg": badge_bg
     }

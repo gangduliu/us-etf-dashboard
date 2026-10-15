@@ -200,7 +200,15 @@ def render_kpi_cards(latest_price, price_change, pct_change, week_52_high, week_
 
 
 def render_advice_card(advice):
-    """渲染升级后的多因子量化交易决策 Banner"""
+    """渲染升级后的多因子量化交易决策 Banner (已包含建议买入/卖出价)"""
+    
+    # 从返回字典中获取建议价格，若无则显示暂无
+    buy_price = advice.get('suggested_buy_price', None)
+    sell_price = advice.get('suggested_sell_price', None)
+    
+    buy_str = f"${buy_price:.2f}" if buy_price is not None else "暂无"
+    sell_str = f"${sell_price:.2f}" if sell_price is not None else "暂无"
+
     st.markdown(f"""
     <div style="background-color: {advice['badge_bg']}; border-left: 5px solid {advice['badge_color']}; padding: 16px 20px; border-radius: 8px; margin-bottom: 20px;">
         <div style="font-size: 1.1rem; font-weight: 700; color: {advice['badge_color']}; margin-bottom: 6px;">
@@ -209,7 +217,18 @@ def render_advice_card(advice):
         <div style="font-size: 0.9rem; color: #334155; line-height: 1.5;">
             {advice['desc']}
         </div>
-        <div style="margin-top: 10px; font-size: 0.82rem; color: #64748B; display: flex; flex-wrap: wrap; gap: 16px;">
+        <!-- 核心价格与评分 (取消白色独立背景框，通过上下微细分割线与底色融为一体) -->
+        <div style="display: flex; gap: 16px; align-items: center; padding: 10px 0;">
+            <div style="flex: 1;">
+                <div style="font-size: 0.75rem; color: #64748B; font-weight: 500;">🟢 建议买入价</div>
+                <div style="font-size: 1.0rem; font-weight: 700; color: #166534; margin-top: 2px;">{buy_str}</div>
+            </div>
+            <div style="flex: 1;">
+                <div style="font-size: 0.75rem; color: #64748B; font-weight: 500;">🔴 建议卖出价</div>
+                <div style="font-size: 1.0rem; font-weight: 700; color: #991B1B; margin-top: 2px;">{sell_str}</div>
+            </div>
+        </div>
+        <div style="font-size: 0.82rem; color: #64748B; display: flex; flex-wrap: wrap; gap: 16px;">
             <span>量化综合评分: <b>{advice.get('score', 0):+} 分</b></span>
             <span>200日均线 (MA200): <b>${advice['ma200']:.2f}</b></span>
             <span>MA200 乖离率: <b>{advice['ma_bias']:+.1f}%</b></span>
