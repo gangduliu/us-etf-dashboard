@@ -447,9 +447,9 @@ with tab5:
             st.session_state.portfolio_data,
             column_config={
                 "ticker": st.column_config.TextColumn("代码 (Ticker)", required=True, width="small"),
-                "shares": st.column_config.NumberColumn("持股数", min_value=0.01, step=1.0, format="%.2f"),
-                "cost_price": st.column_config.NumberColumn("成本单价 ($)", min_value=0.01, step=0.01, format="$%.2f"),
-                "target_pct": st.column_config.NumberColumn("目标权重 (%)", min_value=0.0, max_value=100.0, step=5.0, format="%.1f%%")
+                "shares": st.column_config.NumberColumn("持股数", min_value=0, step=1, format="%d"),
+                "cost_price": st.column_config.NumberColumn("成本单价 ($)", min_value=0.001, step=0.001, format="$%.3f"),
+                "target_pct": st.column_config.NumberColumn("目标权重 (%)", min_value=0, max_value=100, step=5, format="%d%%")
             },
             num_rows="dynamic",
             use_container_width=True,
@@ -483,9 +483,9 @@ with tab5:
             column_config={
                 "代码": st.column_config.TextColumn("代码", width="small"),
                 "名称": st.column_config.TextColumn("名称", width="large"),
-                "持仓股数": st.column_config.NumberColumn("持股数", format="%.2f"),
-                "持仓成本价 ($)": st.column_config.NumberColumn("成本价", format="$%.2f"),
-                "当前现价 ($)": st.column_config.NumberColumn("当前现价", format="$%.2f"),
+                "持仓股数": st.column_config.NumberColumn("持股数", format="%d"),
+                "持仓成本价 ($)": st.column_config.NumberColumn("成本价", format="$%.3f"),
+                "当前现价 ($)": st.column_config.NumberColumn("当前现价", format="$%.3f"),
                 "当前总市值 ($)": st.column_config.NumberColumn("总市值", format="$%.2f"),
                 "持仓成本总额 ($)": st.column_config.NumberColumn("成本总额", format="$%.2f"),
                 "累计盈亏 ($)": st.column_config.NumberColumn("累计盈亏", format="$%.2f"),
