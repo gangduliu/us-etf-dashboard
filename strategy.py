@@ -209,12 +209,12 @@ def calculate_portfolio_metrics(portfolio_df, market_data):
 
 
 # 常见宽基 ETF 与 行业/高股息 ETF 识别分类库
-BROAD_MARKET_ETFS = {"VOO", "VT", "SPY", "IVV", "QQQ", "VTI", "SCHB", "SPLG"}
+BROAD_MARKET_ETFS = {"VOO", "VT", "SPY", "IVV", "QQQ", "VTI", "SCHB", "SPYM"}
 SECTOR_THEME_ETFS = {"VGT", "SCHD", "XLE", "XLF", "XLK", "XLV", "ARKK", "SMH", "SOXX", "JEPI", "JEPQ", "IWM"}
 
 def analyze_portfolio_health(portfolio_df, market_data, sector_p_df):
     """
-    方案 B: 风格区分版诊断算法
+    风格区分版诊断算法
     根据 宽基 ETF / 行业及主题 ETF / 单股票 采用不同的集中度阈值
     """
     suggestions = []

@@ -44,18 +44,16 @@ with st.sidebar:
     
     # 初始化输入框状态 (默认 VOO)
     if "ticker_input" not in st.session_state:
-        st.session_state.ticker_input = "VOO"
+        st.session_state.ticker_input = "SPYM"
         
     # 3 个核心 ETF 快捷按钮
     st.caption("热门快捷标的：")
-    col_quick1, col_quick2, col_quick3 = st.columns(3)
+    col_quick1, col_quick2 = st.columns(2)
     
-    if col_quick1.button("VOO", use_container_width=True):
-        st.session_state.ticker_input = "VOO"
-    if col_quick2.button("VGT", use_container_width=True):
-        st.session_state.ticker_input = "VGT"
-    if col_quick3.button("SCHD", use_container_width=True):
-        st.session_state.ticker_input = "SCHD"
+    if col_quick1.button("SPYM", use_container_width=True):
+        st.session_state.ticker_input = "SPYM"
+    if col_quick2.button("SCHG", use_container_width=True):
+        st.session_state.ticker_input = "SCHG"
         
     # 代码文本输入框 (自动绑定快捷按钮的选择)
     user_ticker = st.text_input(
@@ -307,7 +305,7 @@ with tab3:
 with tab4:
     try:
         # 对比标的池：包含当前查询的标的 + 常用基准
-        compare_targets = list(set([user_ticker, "VOO", "VGT", "SCHD"]))
+        compare_targets = list(set([user_ticker, "SPYM", "SCHG"]))
         df_raw_prices = load_all_historical_returns(compare_targets)
         df_filtered_prices = filter_by_range(df_raw_prices, time_range)
         
@@ -323,9 +321,8 @@ with tab4:
 
 # 全局初始化 Session State 默认持仓与 Key 计数器
 DEFAULT_PORTFOLIO = pd.DataFrame([
-    {"ticker": "VOO", "shares": 5.0, "cost_price": 700.0, "target_pct": 60.0},
-    {"ticker": "VGT", "shares": 6.0, "cost_price": 120.0, "target_pct": 20.0},
-    {"ticker": "SCHD", "shares": 20.0, "cost_price": 30.0, "target_pct": 20.0}
+    {"ticker": "SPYM", "shares": 5, "cost_price": 90, "target_pct": 60},
+    {"ticker": "SCHG", "shares": 10, "cost_price": 35, "target_pct": 40}
 ])
 
 if "portfolio_data" not in st.session_state:
@@ -448,7 +445,7 @@ with tab5:
             column_config={
                 "ticker": st.column_config.TextColumn("代码 (Ticker)", required=True, width="small"),
                 "shares": st.column_config.NumberColumn("持股数", min_value=0, step=1, format="%d"),
-                "cost_price": st.column_config.NumberColumn("成本单价 ($)", min_value=0.001, step=0.001, format="$%.3f"),
+                "cost_price": st.column_config.NumberColumn("成本单价 ($)", min_value=0, step=0.001, format="$%.3f"),
                 "target_pct": st.column_config.NumberColumn("目标权重 (%)", min_value=0, max_value=100, step=5, format="%d%%")
             },
             num_rows="dynamic",
@@ -504,7 +501,7 @@ with tab5:
         with col_rebal_title:
             st.write("")
         with col_cash_input:
-            new_cash = st.number_input("💵 拟新增投入资金 ($USD):", min_value=0.0, value=0.0, step=500.0, help="输入您本次计划加仓的金额，计算器将自动以存量+新资金综合平衡分配")
+            new_cash = st.number_input("💵 拟新增投入资金 ($USD):", min_value=0.0, value=0.0, step=100.0, help="输入您本次计划加仓的金额，计算器将自动以存量+新资金综合平衡分配")
 
         rebalance_df, total_curr_val, target_tot_val = calculate_portfolio_rebalance(valid_portfolio, market_data, new_cash)
         render_rebalance_dashboard(rebalance_df, total_curr_val, target_tot_val, new_cash)
