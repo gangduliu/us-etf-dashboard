@@ -20,11 +20,11 @@ from data import (
 from strategy import (
     analyze_trading_signal, calculate_portfolio_metrics,
     analyze_portfolio_health, calculate_portfolio_rebalance,
-    calculate_portfolio_dividends
+    calculate_portfolio_dividends, calculate_performance_metrics
 )
 from ui import (
     inject_custom_css, render_header, render_kpi_cards, 
-    render_advice_card, render_comparison_chart,
+    render_advice_card, render_advanced_comparison_chart,
     render_portfolio_summary_cards, render_portfolio_charts,
     render_portfolio_advisory, render_rebalance_dashboard,
     render_dividend_dashboard
@@ -301,22 +301,74 @@ with tab3:
         else:
             st.info("该标的近一年内无派息记录（或不分红）。")
 
-# Tab 4: 收益对比页
+# Tab 4: 收益与风险全方位对比页
 with tab4:
-    try:
-        # 对比标的池：包含当前查询的标的 + 常用基准
-        compare_targets = list(set([user_ticker, "SPYM", "SCHG"]))
-        df_raw_prices = load_all_historical_returns(compare_targets)
-        df_filtered_prices = filter_by_range(df_raw_prices, time_range)
+    # 单独一列展示多选框，布局更加宽敞整洁
+    default_tickers = list(dict.fromkeys([user_ticker, "SPYM", "SCHG"]))
+    extended_universe = list(dict.fromkeys(default_tickers + ["QQQ", "AAPL", "NVDA", "MSFT"]))
         
-        if not df_filtered_prices.empty and len(df_filtered_prices) > 1: # type: ignore
-            start_prices = df_filtered_prices.iloc[0] # type: ignore
-            df_cumulative_returns = ((df_filtered_prices / start_prices) - 1) * 100
-            render_comparison_chart(df_cumulative_returns, time_range)
-        else:
-            st.warning("所选时间段内数据不足，无法生成对比图。")
-    except Exception as e:
-        st.error(f"加载对比数据失败: {e}")
+    col_select, col_input = st.columns([1.5, 1], gap="medium")
+        
+    with col_select:
+        selected_from_preset = st.multiselect(
+            "🎯 选择或搜索常用标的 (最多 5 个)",
+            options=extended_universe,
+            default=default_tickers,
+            max_selections=5,
+            help="快速勾选主流美股与ETF"
+        )
+        
+    # 2. 自定义输入框：专门用来补充输入不在列表里的任意代码
+    with col_input:
+        custom_input = st.text_input(
+            "✍️ 自定义添加代码 (可选)",
+            placeholder="例如: TSLA, NFLX (多代码用逗号隔开)",
+            help="如果想对比列表中没有的代码，可直接在此输入，支持英文逗号分隔"
+        )
+
+    # 🔄 整合并清洗最终的对比标的池（去重、转大写、去空格、过滤空值）
+    custom_list = [t.strip().upper() for t in custom_input.split(",") if t.strip()] if custom_input else []
+    
+    # 合并预设选择与自定义输入，并确保总数不超过 5 个
+    selected_tickers = list(dict.fromkeys(selected_from_preset + custom_list))[:5]
+
+    if not selected_tickers:
+        st.warning("⚠️ 请至少保留或选择一个对比标的。")
+    else:
+        try:
+            # 加载历史数据
+            df_raw_prices = load_all_historical_returns(selected_tickers)
+            df_filtered_prices = filter_by_range(df_raw_prices, time_range)
+            
+            if not df_filtered_prices.empty and len(df_filtered_prices) > 1: # type: ignore
+                start_prices = df_filtered_prices.iloc[0] # type: ignore
+                
+                # 计算累计收益率 (%)
+                df_plot = ((df_filtered_prices / start_prices) - 1) * 100
+                y_axis_title = "累计收益率 (%)"
+                
+                # 渲染对比折线图
+                render_advanced_comparison_chart(df_plot, y_axis_title)
+                
+                # 核心风险收益指标看板
+                st.markdown("### 📊 核心风险收益指标对账单")
+                df_metrics = calculate_performance_metrics(df_filtered_prices)
+                
+                st.dataframe(
+                    df_metrics.style.format({
+                        '累计收益率': '{:.2f}%',
+                        '年化收益率 (CAGR)': '{:.2f}%',
+                        '年化波动率': '{:.2f}%',
+                        '最大回撤': '{:.2f}%',
+                        '夏普比率': '{:.2f}'
+                    }),
+                    use_container_width=True
+                )
+                
+            else:
+                st.warning("所选时间段内数据不足，无法生成对比图与指标。")
+        except Exception as e:
+            st.error(f"加载对比数据失败: {e}")
 
 
 # 全局初始化 Session State 默认持仓与 Key 计数器

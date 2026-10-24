@@ -96,16 +96,19 @@ def load_etf_holdings_and_sectors(ticker_symbol):
 
 
 @st.cache_data(ttl=3600)
-def load_all_historical_returns(tickers=["VOO", "VGT", "SCHD"]):
-    """获取指定代码组的原始收盘价数据 (供对比页使用)"""
+def load_all_historical_returns(tickers):
+    """获取指定代码组的纯收盘价历史数据 (供对比页使用)"""
     df_combined = pd.DataFrame()
     for t in tickers:
         try:
-            hist = yf.Ticker(t).history(period="max")
-            if not hist.empty:
+            ticker_obj = yf.Ticker(t)
+            hist = ticker_obj.history(period="max")
+            
+            if not hist.empty and 'Close' in hist.columns:
                 hist.index = hist.index.tz_localize(None) # type: ignore
                 df_combined[t] = hist['Close']
-        except Exception:
+        except Exception as e:
+            print(f"获取 {t} 历史数据失败: {e}")
             pass
             
     return df_combined.dropna()

@@ -240,26 +240,24 @@ def render_advice_card(advice):
     """, unsafe_allow_html=True)
 
 
-def render_comparison_chart(df_compare, time_range):
-    title_text = "全历史" if time_range == "Max" else f"近 {time_range}"
-    st.markdown(f'<div class="section-title">⚔️ 热门美股 / ETF {title_text} 累计收益率比拼 (%)</div>', unsafe_allow_html=True)
-    
+def render_advanced_comparison_chart(df_compare, y_axis_title):
     fig = px.line(
         df_compare, 
         x=df_compare.index, 
         y=df_compare.columns,
-        labels={'value': '累计收益率 (%)', 'Date': '日期', 'variable': '代码'},
-        template="plotly"
+        labels={'value': y_axis_title, 'Date': '交易日期', 'variable': '标的代码'},
+        template="plotly",
     )
     fig.update_traces(line_width=2.5)
     fig.update_layout(
-        height=380,
+        height=420,
         margin=dict(l=0, r=0, t=10, b=0),
         hovermode="x unified",
         paper_bgcolor='rgba(0,0,0,0)',
         plot_bgcolor='rgba(0,0,0,0)',
-        xaxis=dict(showgrid=False),
-        yaxis=dict(showgrid=True, title="累计收益率 (%)")
+        xaxis=dict(showgrid=False, zeroline=False),
+        yaxis=dict(showgrid=True, gridcolor='rgba(200, 200, 200, 0.2)', title=y_axis_title),
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
     )
     st.plotly_chart(fig, use_container_width=True)
 

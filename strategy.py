@@ -147,6 +147,52 @@ def analyze_trading_signal(hist, latest_price, week_52_high, week_52_low, div_yi
     }
 
 
+def calculate_performance_metrics(df_prices):
+    metrics = []
+    # 假设一年按 252 个交易日计算
+    trading_days = 252
+    
+    for ticker in df_prices.columns:
+        series = df_prices[ticker].dropna()
+        if len(series) < 2:
+            continue
+            
+        # 1. 累计收益率
+        total_return = (series.iloc[-1] / series.iloc[0]) - 1
+        
+        # 2. 年化收益率 (CAGR)
+        days = (series.index[-1] - series.index[0]).days
+        years = days / 365.25
+        cagr = (series.iloc[-1] / series.iloc[0]) ** (1 / years) - 1 if years > 0 else 0
+        
+        # 3. 年化波动率
+        daily_returns = series.pct_change().dropna()
+        annual_volatility = daily_returns.std() * np.sqrt(trading_days)
+        
+        # 4. 最大回撤 (Max Drawdown)
+        rolling_max = series.cummax()
+        drawdown = (series - rolling_max) / rolling_max
+        max_drawdown = drawdown.min()
+        
+        # 5. 夏普比率 (假设无风险利率为 4% / 0.04)
+        risk_free_rate = 0.04
+        sharpe_ratio = (cagr - risk_free_rate) / annual_volatility if annual_volatility > 0 else 0
+        
+        metrics.append({
+            "标的代码": ticker,
+            "累计收益率": total_return * 100,
+            "年化收益率 (CAGR)": cagr * 100,
+            "年化波动率": annual_volatility * 100,
+            "最大回撤": max_drawdown * 100,
+            "夏普比率": sharpe_ratio
+        })
+        
+    df_result = pd.DataFrame(metrics)
+    if not df_result.empty:
+        df_result.set_index("标的代码", inplace=True)
+    return df_result
+
+
 def calculate_portfolio_metrics(portfolio_df, market_data):
     """计算投资组合的总资产、总成本、累计浮盈浮亏及当日盈亏"""
     total_cost = 0.0
