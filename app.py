@@ -101,11 +101,8 @@ render_header(user_ticker, info, is_etf)
 render_kpi_cards(latest_price, price_change, pct_change, week_52_high, week_52_low, div_yield, info, is_etf, size_val)
 
 # 5. 动态 Tab 命名
-tab2_title = "🧩 行业分布与重仓股" if is_etf else "🏢 核心财务与公司概况"
-tab1, tab2, tab3, tab4, tab5 = st.tabs([
+tab1, tab2, tab3 = st.tabs([
     f"📊 {user_ticker} 走势与策略", 
-    tab2_title, 
-    "💰 历史回报与分红", 
     "⚔️ 热门美股/ETF 走势对比",
     "💼 投资组合管理"
 ])
@@ -115,73 +112,34 @@ with tab1:
     trading_advice = analyze_trading_signal(hist, latest_price, week_52_high, week_52_low, div_yield)
     render_advice_card(trading_advice)
 
-    col_chart, col_calc = st.columns([2.2, 1])
+    st.markdown(f'<div class="section-title">📉 {user_ticker} 历史价格走势曲线</div>', unsafe_allow_html=True)
+    fig_price = px.line(
+        filtered_hist, 
+        x=filtered_hist.index,  # type: ignore
+        y='Close',
+        labels={'Close': '收盘价 (USD)', 'Date': '日期'},
+        template="plotly"
+    )
+    fig_price.update_traces(
+        line_color="#0F766E", 
+        line_width=2.5,
+        hovertemplate="日期: %{x|%Y-%m-%d}<br>价格: <b>$%{y:.2f}</b><extra></extra>"
+    )
+    fig_price.update_layout(
+        height=400,
+        margin=dict(l=0, r=0, t=10, b=0),
+        hovermode="x unified",
+        paper_bgcolor='rgba(0,0,0,0)',
+        plot_bgcolor='rgba(0,0,0,0)',
+        xaxis=dict(showgrid=False),
+        yaxis=dict(showgrid=True, title="")
+    )
+    st.plotly_chart(fig_price, use_container_width=True)
+
+    st.divider()
+    title = "🧩 行业分布与重仓股" if is_etf else "🏢 核心财务与公司概况"
+    st.markdown(f'<div class="section-title">{title}</div>', unsafe_allow_html=True)
     
-    with col_chart:
-        st.markdown(f'<div class="section-title">📉 {user_ticker} 历史价格走势曲线</div>', unsafe_allow_html=True)
-        fig_price = px.line(
-            filtered_hist, 
-            x=filtered_hist.index,  # type: ignore
-            y='Close',
-            labels={'Close': '收盘价 (USD)', 'Date': '日期'},
-            template="plotly"
-        )
-        fig_price.update_traces(
-            line_color="#0F766E", 
-            line_width=2.5,
-            hovertemplate="日期: %{x|%Y-%m-%d}<br>价格: <b>$%{y:.2f}</b><extra></extra>"
-        )
-        fig_price.update_layout(
-            height=400,
-            margin=dict(l=0, r=0, t=10, b=0),
-            hovermode="x unified",
-            paper_bgcolor='rgba(0,0,0,0)',
-            plot_bgcolor='rgba(0,0,0,0)',
-            xaxis=dict(showgrid=False),
-            yaxis=dict(showgrid=True, title="")
-        )
-        st.plotly_chart(fig_price, use_container_width=True)
-
-    with col_calc:
-        st.markdown('<div class="section-title">🧮 模拟定投/复利计算器</div>', unsafe_allow_html=True)
-        initial_invest = st.number_input("初始投入 ($)", value=10000, step=1000)
-        monthly_invest = st.number_input("每月定投 ($)", value=500, step=100)
-        invest_years = st.slider("投资期限 (年)", min_value=1, max_value=30, value=10)
-        
-        default_return = 12.0 if not is_etf else 8.5
-        expected_return = st.slider("预期年化收益率 (%)", min_value=1.0, max_value=30.0, value=default_return, step=0.5)
-
-        months = invest_years * 12
-        monthly_rate = (1 + expected_return / 100) ** (1/12) - 1
-        total_principal = initial_invest + monthly_invest * months
-        total_balance = initial_invest * ((1 + monthly_rate) ** months)
-        for m in range(1, months + 1):
-            total_balance += monthly_invest * ((1 + monthly_rate) ** (months - m))
-        profit = total_balance - total_principal
-
-        st.markdown(
-            f"""
-            <div style="
-                background-color: var(--background-secondary, rgba(15, 118, 110, 0.08)); 
-                border: 1px solid var(--border-color, rgba(15, 118, 110, 0.3)); 
-                padding: 18px; 
-                border-radius: 10px; 
-                margin-top: 10px;
-                color: var(--text-color);
-            ">
-                <div style="font-size: 0.85rem; opacity: 0.8; font-weight: 600;">预估期末资产 ({invest_years}年后)</div>
-                <div style="font-size: 1.8rem; font-weight: 700; margin: 6px 0;">${total_balance:,.0f}</div>
-                <div style="font-size: 0.85rem; opacity: 0.85;">
-                    累计本金: <b>${total_principal:,.0f}</b><br>
-                    预计纯收益: <b>${profit:,.0f}</b> (+{(profit/total_principal)*100:.1f}%)
-                </div>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
-
-# Tab 2: 智能判断 (ETF 显示持仓/行业，个股显示基本面指标)
-with tab2:
     if is_etf:
         sector_data, top_holdings = load_etf_holdings_and_sectors(user_ticker)
         col_sector, col_holdings = st.columns([1, 1.1])
@@ -231,8 +189,8 @@ with tab2:
         st.markdown("##### 📝 公司业务简介")
         st.write(info.get('longBusinessSummary', '暂无详细介绍。'))
 
-# Tab 3: 历史回报与分红
-with tab3:
+    st.divider()
+    st.markdown(f'<div class="section-title">💰 历史回报与分红</div>', unsafe_allow_html=True)
     col_annual, col_div = st.columns([1, 1])
     years_limit = get_range_years_limit(time_range)
     
@@ -301,8 +259,8 @@ with tab3:
         else:
             st.info("该标的近一年内无派息记录（或不分红）。")
 
-# Tab 4: 收益与风险全方位对比页
-with tab4:
+# Tab 2: 收益与风险全方位对比页
+with tab2:
     # 单独一列展示多选框，布局更加宽敞整洁
     default_tickers = list(dict.fromkeys([user_ticker, "SPYM", "SCHG"]))
     extended_universe = list(dict.fromkeys(default_tickers + ["QQQ", "AAPL", "NVDA", "MSFT"]))
@@ -403,8 +361,8 @@ def handle_file_upload():
       st.session_state.uploader_key_id += 1
 
 
-# Tab 5: 投资组合管理 & 再平衡计算器
-with tab5:
+# Tab 3: 投资组合管理 & 再平衡计算器
+with tab3:
     st.markdown('<div class="section-title">💼 我的投资组合配置与实盘跟踪</div>', unsafe_allow_html=True)
 
     # 持仓明细编辑与文件备份/恢复面板
