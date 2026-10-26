@@ -31,3 +31,17 @@ pg = st.navigation({
 
 # 4. 运行选中的页面
 pg.run()
+
+# 5. 🌟 在侧边栏底部统一注入“Buy Me a Coffee”赞助按钮
+with st.sidebar:
+    st.divider()
+    st.markdown("### ☕ 支持作者")
+    st.markdown(
+        """
+        <div style="text-align: center; margin-bottom: 10px;">
+            <p style="font-size: 0.85rem; opacity: 0.8; margin-bottom: 10px;">如果这个看板对你有帮助，欢迎请我喝一杯咖啡！☕</p>
+            <a href="https://www.buymeacoffee.com/qingning618"><img src="https://img.buymeacoffee.com/button-api/?text=Buy me a lime&emoji=🍋‍🟩&slug=qingning618&button_colour=40DCA5&font_colour=ffffff&font_family=Cookie&outline_colour=000000&coffee_colour=FFDD00" /></a>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
