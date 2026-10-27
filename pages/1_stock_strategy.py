@@ -47,10 +47,10 @@ with col_right:
 # 快捷按钮紧凑排列在输入框下方，整洁不拥挤
 st.markdown('<div style="font-size: 0.8rem; opacity: 0.7; margin-top: 6px; margin-bottom: 6px;">常用快捷标的：</div>', unsafe_allow_html=True)
 q_cols = st.columns(6)
-q_cols[3].button("VOO", on_click=set_ticker, args=("VOO",), use_container_width=True)
-q_cols[0].button("SPYM", on_click=set_ticker, args=("SPYM",), use_container_width=True)
-q_cols[1].button("SCHG", on_click=set_ticker, args=("SCHG",), use_container_width=True)
-q_cols[2].button("QQQ", on_click=set_ticker, args=("QQQ",), use_container_width=True)
+q_cols[0].button("VOO", on_click=set_ticker, args=("VOO",), use_container_width=True)
+q_cols[1].button("SPYM", on_click=set_ticker, args=("SPYM",), use_container_width=True)
+q_cols[2].button("SCHG", on_click=set_ticker, args=("SCHG",), use_container_width=True)
+q_cols[3].button("QQQ", on_click=set_ticker, args=("QQQ",), use_container_width=True)
 q_cols[4].button("AAPL", on_click=set_ticker, args=("AAPL",), use_container_width=True)
 q_cols[5].button("NVDA", on_click=set_ticker, args=("NVDA",), use_container_width=True)
 
