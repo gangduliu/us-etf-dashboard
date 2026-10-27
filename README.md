@@ -1,6 +1,10 @@
 # 📊 美股与 ETF 投资分析与组合管理看板
 # US Stock & ETF Analysis & Portfolio Management Dashboard
 
+🔗 **在线体验地址**：[https://us-etf-dashboard-mbgpiwkqkt38tbatgqzdal.streamlit.app/](https://us-etf-dashboard-mbgpiwkqkt38tbatgqzdal.streamlit.app/)
+
+---
+
 ### 🌟 项目简介
 这是一个基于 **Python** 与 **Streamlit** 构建的专业级美股/ETF 投资分析与组合管理看板。专为长期指数投资者、定投族及量化资产配置者设计，提供包含多因子量化交易信号、风格区分健康诊断、一键再平衡计算器及被动现金流预估在内的全套资产分析工具。系统现已升级为多页面现代化投研终端。
 
