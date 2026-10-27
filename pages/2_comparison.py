@@ -7,31 +7,37 @@ from ui import inject_custom_css, render_advanced_comparison_chart
 st.set_page_config(page_title="走势与风险对比", page_icon="⚔️", layout="wide")
 inject_custom_css()
 
-st.markdown('<div class="header-banner"><h1>⚔️ 热门美股与 ETF 走势和风险对比</h1><p>多标的同期收益率曲线及核心风险收益指标对账单</p></div>', unsafe_allow_html=True)
+# 页面顶部标的筛选与时间跨度控制栏
+st.markdown("#### 🎯 标的对比与时间范围配置")
 
-with st.sidebar:
-    st.markdown("### ⚙️ 对比配置")
-    time_range = st.selectbox(
-        "时间跨度筛选",
-        options=["1Y", "3Y", "5Y", "10Y", "Max"],
-        index=3
-    )
+col_select, col_input, col_range = st.columns([2, 1.5, 1], gap="medium")
 
 default_tickers = ["SPYM", "SCHG", "QQQ"]
-extended_universe = list(dict.fromkeys(default_tickers + ["AAPL", "NVDA", "MSFT", "VOO"]))
+extended_universe = list(
+    dict.fromkeys(default_tickers + ["AAPL", "NVDA", "MSFT", "VOO"])
+)
 
-col_select, col_input = st.columns([1.5, 1], gap="medium")
 with col_select:
     selected_from_preset = st.multiselect(
-        "🎯 选择或搜索常用标的 (最多 5 个)",
+        "选择或搜索预设标的 (最多 5 个)",
         options=extended_universe,
         default=default_tickers,
-        max_selections=5
+        max_selections=5,
+        help="快速勾选主流美股与 ETF",
     )
+
 with col_input:
     custom_input = st.text_input(
         "✍️ 自定义添加代码 (可选)",
-        placeholder="例如: TSLA, NFLX"
+        placeholder="例如: TSLA, NFLX",
+        help="多代码用英文逗号分隔",
+    )
+
+with col_range:
+    time_range = st.selectbox(
+        "📅 时间跨度筛选",
+        options=["1Y", "3Y", "5Y", "10Y", "Max"],
+        index=3,
     )
 
 custom_list = [t.strip().upper() for t in custom_input.split(",") if t.strip()] if custom_input else []

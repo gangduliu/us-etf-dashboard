@@ -15,29 +15,46 @@ from ui import (
 st.set_page_config(page_title="走势与策略", page_icon="📊", layout="wide")
 inject_custom_css()
 
-# 侧边栏配置
-with st.sidebar:
-    st.markdown("### 🔍 查询美股 / ETF")
-    if "ticker_input" not in st.session_state:
-        st.session_state.ticker_input = "SPYM"
-        
-    col_quick1, col_quick2 = st.columns(2)
-    if col_quick1.button("SPYM", use_container_width=True):
-        st.session_state.ticker_input = "SPYM"
-    if col_quick2.button("SCHG", use_container_width=True):
-        st.session_state.ticker_input = "SCHG"
-        
+# 1. 初始化 Session State
+if "ticker_input" not in st.session_state:
+    st.session_state.ticker_input = "SPYM"
+
+# 定义快捷按钮点击的回调函数
+def set_ticker(val):
+    st.session_state.ticker_input = val
+
+# 2. 页面顶部搜索与时间跨度筛选控制栏
+st.markdown("#### 🔍 标的查询与参数配置")
+
+# 左右两列大布局：左侧放输入框与快捷按钮，右侧放时间跨度筛选
+col_left, col_right = st.columns([3, 1], gap="large")
+
+with col_left:
     user_ticker = st.text_input(
-        "输入任意美股/ETF代码",
-        value=st.session_state.ticker_input
+        "输入任意美股 / ETF 代码",
+        value=st.session_state.ticker_input,
+        key="ticker_input",
+        placeholder="例如: TSLA, MSFT, QQQ"
     ).strip().upper()
-    
-    st.divider()
+
+with col_right:
     time_range = st.selectbox(
         "时间跨度筛选",
         options=["1Y", "3Y", "5Y", "10Y", "Max"],
         index=3
     )
+
+# 快捷按钮紧凑排列在输入框下方，整洁不拥挤
+st.markdown('<div style="font-size: 0.8rem; opacity: 0.7; margin-top: 6px; margin-bottom: 6px;">常用快捷标的：</div>', unsafe_allow_html=True)
+q_cols = st.columns(6)
+q_cols[3].button("VOO", on_click=set_ticker, args=("VOO",), use_container_width=True)
+q_cols[0].button("SPYM", on_click=set_ticker, args=("SPYM",), use_container_width=True)
+q_cols[1].button("SCHG", on_click=set_ticker, args=("SCHG",), use_container_width=True)
+q_cols[2].button("QQQ", on_click=set_ticker, args=("QQQ",), use_container_width=True)
+q_cols[4].button("AAPL", on_click=set_ticker, args=("AAPL",), use_container_width=True)
+q_cols[5].button("NVDA", on_click=set_ticker, args=("NVDA",), use_container_width=True)
+
+st.divider()
 
 if not user_ticker:
     st.warning("请输入有效的美股或 ETF 代码。")

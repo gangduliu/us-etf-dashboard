@@ -18,8 +18,6 @@ from ui import (
 st.set_page_config(page_title="投资组合管理", page_icon="💼", layout="wide")
 inject_custom_css()
 
-st.markdown('<div class="header-banner"><h1>💼 我的投资组合管理与再平衡</h1><p>实盘跟踪、健康诊断、一键再平衡计算及被动现金流预估</p></div>', unsafe_allow_html=True)
-
 DEFAULT_PORTFOLIO = pd.DataFrame([
     {"ticker": "SPYM", "shares": 5, "cost_price": 90, "target_pct": 60},
     {"ticker": "SCHG", "shares": 10, "cost_price": 35, "target_pct": 40}
