@@ -27,9 +27,17 @@ def set_ticker(val):
 st.markdown("#### 🔍 标的查询与参数配置")
 
 # 左右两列大布局：左侧放输入框与快捷按钮，右侧放时间跨度筛选
-col_left, col_right = st.columns([3, 1], gap="large")
+col_left, col_middle, col_right = st.columns([2, 1, 1], gap="small")
 
 with col_left:
+    # 快捷按钮紧凑排列在输入框下方，整洁不拥挤
+    st.markdown('<div style="font-size: 0.8rem; opacity: 0.7; margin-bottom: 6px;">常用快捷标的：</div>', unsafe_allow_html=True)
+    q_cols = st.columns(3)
+    q_cols[0].button("SPYM", on_click=set_ticker, args=("SPYM",), use_container_width=True)
+    q_cols[1].button("SCHG", on_click=set_ticker, args=("SCHG",), use_container_width=True)
+    q_cols[2].button("QQQ", on_click=set_ticker, args=("QQQ",), use_container_width=True)
+
+with col_middle:
     user_ticker = st.text_input(
         "输入任意美股 / ETF 代码",
         value=st.session_state.ticker_input,
@@ -43,16 +51,6 @@ with col_right:
         options=["1Y", "3Y", "5Y", "10Y", "Max"],
         index=3
     )
-
-# 快捷按钮紧凑排列在输入框下方，整洁不拥挤
-st.markdown('<div style="font-size: 0.8rem; opacity: 0.7; margin-top: 6px; margin-bottom: 6px;">常用快捷标的：</div>', unsafe_allow_html=True)
-q_cols = st.columns(6)
-q_cols[0].button("VOO", on_click=set_ticker, args=("VOO",), use_container_width=True)
-q_cols[1].button("SPYM", on_click=set_ticker, args=("SPYM",), use_container_width=True)
-q_cols[2].button("SCHG", on_click=set_ticker, args=("SCHG",), use_container_width=True)
-q_cols[3].button("QQQ", on_click=set_ticker, args=("QQQ",), use_container_width=True)
-q_cols[4].button("AAPL", on_click=set_ticker, args=("AAPL",), use_container_width=True)
-q_cols[5].button("NVDA", on_click=set_ticker, args=("NVDA",), use_container_width=True)
 
 st.divider()
 
@@ -166,29 +164,59 @@ else:
 # ==================== 恢复：历史回报与分红图表模块 ====================
 st.divider()
 st.markdown(f'<div class="section-title">💰 历史回报与分红</div>', unsafe_allow_html=True)
-col_annual, col_div = st.columns([1, 1])
 years_limit = get_range_years_limit(time_range)
 
-with col_annual:
-    st.markdown(f'<div class="section-title">📅 近 {time_range if time_range != "Max" else "历史"} 年度收益率 (%)</div>', unsafe_allow_html=True)
-    annual_hist = hist['Close'].resample('YE').last()
-    annual_returns = annual_hist.pct_change().dropna() * 100
-    annual_df = pd.DataFrame({
-        "Year": annual_returns.index.year, # type: ignore
-        "Return": annual_returns.values
-    }).tail(years_limit)
+st.markdown(f'<div class="section-title">📅 近 {time_range if time_range != "Max" else "历史"} 年度收益率 (%)</div>', unsafe_allow_html=True)
+annual_hist = hist['Close'].resample('YE').last()
+annual_returns = annual_hist.pct_change().dropna() * 100
+annual_df = pd.DataFrame({
+    "Year": annual_returns.index.year, # type: ignore
+    "Return": annual_returns.values
+}).tail(years_limit)
+
+annual_df['Color'] = annual_df['Return'].apply(lambda x: '#0F766E' if x >= 0 else '#F43F5E')
+
+fig_bar = px.bar(
+    annual_df, 
+    x='Year', 
+    y='Return', 
+    text_auto='.1f', # type: ignore
+    template="plotly"
+)
+fig_bar.update_traces(marker_color=annual_df['Color'], textposition='outside')
+fig_bar.update_layout(
+    yaxis_title="", 
+    xaxis_title="",
+    height=360,
+    margin=dict(l=0, r=0, t=10, b=0),
+    paper_bgcolor='rgba(0,0,0,0)',
+    plot_bgcolor='rgba(0,0,0,0)',
+    xaxis=dict(showgrid=False, dtick=1),
+    yaxis=dict(showgrid=True)
+)
+st.plotly_chart(fig_bar, use_container_width=True)
+
+
+st.markdown(f'<div class="section-title">💵 近 {time_range if time_range != "Max" else "历史"} 每股年度分红 (USD)</div>', unsafe_allow_html=True)
+if not dividends.empty:
+    div_df = dividends.resample('YE').sum().reset_index()
+    div_df['Year'] = div_df['Date'].dt.year
+    div_df = div_df.tail(years_limit)
     
-    annual_df['Color'] = annual_df['Return'].apply(lambda x: '#0F766E' if x >= 0 else '#F43F5E')
-    
-    fig_bar = px.bar(
-        annual_df, 
+    fig_div = px.line(
+        div_df, 
         x='Year', 
-        y='Return', 
-        text_auto='.1f', # type: ignore
+        y='Dividends', 
+        markers=True,
         template="plotly"
     )
-    fig_bar.update_traces(marker_color=annual_df['Color'], textposition='outside')
-    fig_bar.update_layout(
+    fig_div.update_traces(
+        line_color="#0F766E", 
+        marker_color="#14B8A6", 
+        marker_size=8,
+        hovertemplate="年份: %{x}<br>每股分红: <b>$%{y:.2f}</b><extra></extra>"
+    )
+    fig_div.update_layout(
         yaxis_title="", 
         xaxis_title="",
         height=360,
@@ -198,38 +226,6 @@ with col_annual:
         xaxis=dict(showgrid=False, dtick=1),
         yaxis=dict(showgrid=True)
     )
-    st.plotly_chart(fig_bar, use_container_width=True)
-
-with col_div:
-    st.markdown(f'<div class="section-title">💵 近 {time_range if time_range != "Max" else "历史"} 每股年度分红 (USD)</div>', unsafe_allow_html=True)
-    if not dividends.empty:
-        div_df = dividends.resample('YE').sum().reset_index()
-        div_df['Year'] = div_df['Date'].dt.year
-        div_df = div_df.tail(years_limit)
-        
-        fig_div = px.line(
-            div_df, 
-            x='Year', 
-            y='Dividends', 
-            markers=True,
-            template="plotly"
-        )
-        fig_div.update_traces(
-            line_color="#0F766E", 
-            marker_color="#14B8A6", 
-            marker_size=8,
-            hovertemplate="年份: %{x}<br>每股分红: <b>$%{y:.2f}</b><extra></extra>"
-        )
-        fig_div.update_layout(
-            yaxis_title="", 
-            xaxis_title="",
-            height=360,
-            margin=dict(l=0, r=0, t=10, b=0),
-            paper_bgcolor='rgba(0,0,0,0)',
-            plot_bgcolor='rgba(0,0,0,0)',
-            xaxis=dict(showgrid=False, dtick=1),
-            yaxis=dict(showgrid=True)
-        )
-        st.plotly_chart(fig_div, use_container_width=True)
-    else:
-        st.info("该标的近一年内无派息记录（或不分红）。")
+    st.plotly_chart(fig_div, use_container_width=True)
+else:
+    st.info("该标的近一年内无派息记录（或不分红）。")
