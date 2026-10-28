@@ -6,7 +6,7 @@ from data import (
     filter_by_range, calculate_ttm_dividend_yield,
     get_asset_size_or_market_cap, get_range_years_limit
 )
-from strategy import analyze_trading_signal
+from strategy import analyze_trading_signal, calculate_ticker_performance_metrics
 from ui import (
     inject_custom_css, render_header, render_kpi_cards, 
     render_advice_card
@@ -108,6 +108,24 @@ fig_price.update_layout(
     yaxis=dict(showgrid=True, title="")
 )
 st.plotly_chart(fig_price, use_container_width=True)
+
+total_ret, cagr_val, mdd_val = calculate_ticker_performance_metrics(filtered_hist)
+
+perf_df = pd.DataFrame([{
+    "统计时间跨度": time_range,
+    "起始日期": filtered_hist.index[0].strftime("%Y-%m-%d"), # type: ignore
+    "最新日期": filtered_hist.index[-1].strftime("%Y-%m-%d"), # type: ignore
+    "阶段累计回报率 (Total Return)": f"{total_ret * 100:+.2f}%",
+    "年化回报率 (CAGR)": f"{cagr_val * 100:+.2f}%",
+    "最大回撤 (Max Drawdown)": f"{mdd_val * 100:.2f}%"
+}])
+
+st.markdown("##### 📋 走势图阶段风险与收益指标明细")
+st.dataframe(
+    perf_df,
+    hide_index=True,
+    use_container_width=True
+)
 
 st.divider()
 title = "🧩 行业分布与重仓股" if is_etf else "🏢 核心财务与公司概况"

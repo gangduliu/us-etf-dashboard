@@ -3,6 +3,29 @@ import pandas as pd
 from datetime import datetime, timedelta
 
 
+def calculate_ticker_performance_metrics(df):
+    if df.empty or len(df) < 2:
+        return 0.0, 0.0, 0.0
+    
+    start_price = df['Close'].iloc[0]
+    end_price = df['Close'].iloc[-1]
+    
+    # 1. 累计总回报率
+    total_return = (end_price - start_price) / start_price
+    
+    # 2. 年化回报率 (CAGR)
+    days = (df.index[-1] - df.index[0]).days
+    years = days / 365.25
+    cagr = ((end_price / start_price) ** (1 / years) - 1) if years > 0 else 0.0
+    
+    # 3. 最大回撤 (Maximum Drawdown)
+    roll_max = df['Close'].cummax()
+    drawdown = (df['Close'] - roll_max) / roll_max
+    max_drawdown = drawdown.min()  # 负数
+    
+    return total_return, cagr, max_drawdown
+
+
 def calculate_rsi(prices, period=14):
     """计算 RSI 指标"""
     delta = prices.diff()
