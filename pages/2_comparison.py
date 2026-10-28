@@ -14,7 +14,7 @@ col_select, col_input, col_range = st.columns([2, 1.5, 1], gap="medium")
 
 default_tickers = ["SPYM", "SCHG", "QQQ"]
 extended_universe = list(
-    dict.fromkeys(default_tickers + ["AAPL", "NVDA", "MSFT", "VOO"])
+    dict.fromkeys(default_tickers + ["AAPL", "NVDA", "MSFT"])
 )
 
 with col_select:
