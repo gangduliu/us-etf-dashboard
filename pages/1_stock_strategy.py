@@ -13,7 +13,7 @@ from ui import (
     render_advice_card
 )
 
-st.set_page_config(page_title="Trend & Strategy | 走势与策略", page_icon="📊", layout="wide")
+st.set_page_config(page_title="Trend & Strategy", page_icon="📊", layout="wide")
 inject_custom_css()
 
 # 1. Initialize Session State / 初始化 Session State
@@ -25,12 +25,12 @@ def set_ticker(val):
     st.session_state.ticker_input = val
 
 # 2. Header Search and Time Range Control Bar / 页面顶部搜索与时间跨度筛选控制栏
-st.markdown("#### 🔍 Ticker Search & Configuration / 标的查询与参数配置")
+st.markdown("#### 🔍 Ticker Search & Configuration")
 
 col_left, col_middle, col_right = st.columns([2, 1, 1], gap="small")
 
 with col_left:
-    st.markdown('<div style="font-size: 0.8rem; opacity: 0.7; margin-bottom: 6px;">Popular Tickers / 常用快捷标的：</div>', unsafe_allow_html=True)
+    st.markdown('<div style="font-size: 0.8rem; opacity: 0.7; margin-bottom: 6px;">Popular Tickers:</div>', unsafe_allow_html=True)
     q_cols = st.columns(3)
     q_cols[0].button("SPYM", on_click=set_ticker, args=("SPYM",), use_container_width=True)
     q_cols[1].button("SCHG", on_click=set_ticker, args=("SCHG",), use_container_width=True)
@@ -46,7 +46,7 @@ with col_middle:
 
 with col_right:
     time_range = st.selectbox(
-        "Time Horizon / 时间跨度",
+        "Time Horizon",
         options=["1Y", "3Y", "5Y", "10Y", "Max"],
         index=3
     )
@@ -54,13 +54,13 @@ with col_right:
 st.divider()
 
 if not user_ticker:
-    st.warning("Please enter a valid US Stock or ETF Ticker / 请输入有效的美股或 ETF 代码。")
+    st.warning("Please enter a valid US Stock or ETF Ticker")
     st.stop()
 
 try:
     hist, info, dividends, is_etf = load_stock_or_etf_data(user_ticker)
 except Exception as e:
-    st.error(f"❌ Data Load Failed / 数据加载失败: {e}")
+    st.error(f"❌ Data Load Failed: {e}")
     st.stop()
 
 filtered_hist = filter_by_range(hist, time_range)
@@ -109,7 +109,7 @@ def calculate_ticker_performance_metrics(df):
 total_ret, cagr_val, mdd_val = calculate_ticker_performance_metrics(filtered_hist)
 
 # Historical Price Trend Chart / 历史价格走势曲线
-st.markdown(f'<div class="section-title">📉 {user_ticker} Historical Price Trend ({time_range}) / 历史价格走势</div>', unsafe_allow_html=True)
+st.markdown(f'<div class="section-title">📉 {user_ticker} Historical Price Trend ({time_range})</div>', unsafe_allow_html=True)
 fig_price = px.line(
     filtered_hist, 
     x=filtered_hist.index,  # type: ignore
@@ -135,15 +135,15 @@ st.plotly_chart(fig_price, use_container_width=True)
 
 # Performance Metrics Table Below Chart / 折线图下方：以表格形式展示风险收益指标
 perf_df = pd.DataFrame([{
-    "Time Range / 跨度": time_range,
-    "Start Date / 起始": filtered_hist.index[0].strftime("%Y-%m-%d"), # type: ignore
-    "End Date / 截止": filtered_hist.index[-1].strftime("%Y-%m-%d"), # type: ignore
-    "Total Return / 累计回报": f"{total_ret * 100:+.2f}%",
-    "CAGR / 年化回报率": f"{cagr_val * 100:+.2f}%",
-    "Max Drawdown / 最大回撤": f"{mdd_val * 100:.2f}%"
+    "Time Range": time_range,
+    "Start Date": filtered_hist.index[0].strftime("%Y-%m-%d"), # type: ignore
+    "End Date": filtered_hist.index[-1].strftime("%Y-%m-%d"), # type: ignore
+    "Total Return": f"{total_ret * 100:+.2f}%",
+    "CAGR": f"{cagr_val * 100:+.2f}%",
+    "Max Drawdown": f"{mdd_val * 100:.2f}%"
 }])
 
-st.markdown("##### 📋 Risk & Return Metrics / 阶段风险与收益指标明细")
+st.markdown("##### 📋 Risk & Return Metrics")
 st.dataframe(
     perf_df,
     hide_index=True,
@@ -151,14 +151,14 @@ st.dataframe(
 )
 
 st.divider()
-title = "🧩 Sector Breakdown & Top Holdings / 行业分布与重仓股" if is_etf else "🏢 Key Financials & Company Overview / 核心财务与公司概况"
+title = "🧩 Sector Breakdown & Top Holdings" if is_etf else "🏢 Key Financials & Company Overview"
 st.markdown(f'<div class="section-title">{title}</div>', unsafe_allow_html=True)
 
 if is_etf:
     sector_data, top_holdings = load_etf_holdings_and_sectors(user_ticker)
     col_sector, col_holdings = st.columns([1, 1.1])
     with col_sector:
-        st.markdown(f'<div class="section-title">🧱 {user_ticker} Sector Allocation / 行业分布</div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="section-title">🧱 {user_ticker} Sector Allocation</div>', unsafe_allow_html=True)
         if not sector_data.empty:
             fig_pie = px.pie(
                 sector_data, 
@@ -172,10 +172,10 @@ if is_etf:
             fig_pie.update_layout(margin=dict(l=0, r=0, t=10, b=0), height=360, showlegend=False, paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)')
             st.plotly_chart(fig_pie, use_container_width=True)
         else:
-            st.info("No sector breakdown data available. / 暂无行业分布数据。")
+            st.info("No sector breakdown data available.")
 
     with col_holdings:
-        st.markdown(f'<div class="section-title">🏆 {user_ticker} Top 10 Holdings / 核心重仓股</div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="section-title">🏆 {user_ticker} Top 10 Holdings</div>', unsafe_allow_html=True)
         if not top_holdings.empty:
             st.dataframe(
                 top_holdings,
@@ -189,9 +189,9 @@ if is_etf:
                 height=360
             )
         else:
-            st.info("No holdings data available. / 暂无重仓股明细数据。")
+            st.info("No holdings data available.")
 else:
-    st.markdown(f'<div class="section-title">🏢 {user_ticker} Key Financial Metrics / 公司关键财务指标</div>', unsafe_allow_html=True)
+    st.markdown(f'<div class="section-title">🏢 {user_ticker} Key Financial Metrics</div>', unsafe_allow_html=True)
     c1, c2, c3, c4 = st.columns(4)
     c1.metric("P/E (TTM) / 市盈率", f"{info.get('trailingPE', 0):.2f}" if info.get('trailingPE') else "N/A")
     c2.metric("Forward P/E / 远期市盈率", f"{info.get('forwardPE', 0):.2f}" if info.get('forwardPE') else "N/A")
@@ -199,18 +199,18 @@ else:
     c4.metric("Profit Margin / 净利润率", f"{info.get('profitMargins', 0)*100:.1f}%" if info.get('profitMargins') else "N/A") # type: ignore
 
     st.markdown("<br>", unsafe_allow_html=True)
-    st.markdown("##### 📝 Business Profile / 公司业务简介")
-    st.write(info.get('longBusinessSummary', 'No detailed profile available. / 暂无详细介绍。'))
+    st.markdown("##### 📝 Business Profile")
+    st.write(info.get('longBusinessSummary', 'No detailed profile available.'))
 
 # Historical Returns & Dividend Analysis Module / 历史回报与分红模块
 st.divider()
-st.markdown(f'<div class="section-title">💰 Historical Performance & Dividend Analysis / 历史回报与分红</div>', unsafe_allow_html=True)
+st.markdown(f'<div class="section-title">💰 Historical Performance & Dividend Analysis</div>', unsafe_allow_html=True)
 years_limit = get_range_years_limit(time_range)
 
 col_annual, col_dividend = st.columns([1, 1])
 
 with col_annual:
-    st.markdown(f'<div class="section-title">📅 Annual Return (%) / 近 {time_range if time_range != "Max" else "Max"} 年度收益率</div>', unsafe_allow_html=True)
+    st.markdown(f'<div class="section-title">📅 Annual Return (%)</div>', unsafe_allow_html=True)
     annual_hist = hist['Close'].resample('YE').last()
     annual_returns = annual_hist.pct_change().dropna() * 100
     annual_df = pd.DataFrame({
@@ -241,7 +241,7 @@ with col_annual:
     st.plotly_chart(fig_bar, use_container_width=True)
 
 with col_dividend:
-    st.markdown(f'<div class="section-title">💵 Annual Dividend Per Share (USD) / 近 {time_range if time_range != "Max" else "Max"} 每股年度分红</div>', unsafe_allow_html=True)
+    st.markdown(f'<div class="section-title">💵 Annual Dividend Per Share (USD)</div>', unsafe_allow_html=True)
     if not dividends.empty:
         div_df = dividends.resample('YE').sum().reset_index()
         div_df['Year'] = div_df['Date'].dt.year
@@ -272,4 +272,4 @@ with col_dividend:
         )
         st.plotly_chart(fig_div, use_container_width=True)
     else:
-        st.info("No dividend payout history in the past year. / 该标的近一年内无派息记录（或不分红）。")
+        st.info("No dividend payout history in the past year.")
