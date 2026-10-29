@@ -202,17 +202,17 @@ def calculate_performance_metrics(df_prices):
         sharpe_ratio = (cagr - risk_free_rate) / annual_volatility if annual_volatility > 0 else 0
         
         metrics.append({
-            "标的代码": ticker,
-            "累计收益率": total_return * 100,
-            "年化收益率 (CAGR)": cagr * 100,
-            "年化波动率": annual_volatility * 100,
-            "最大回撤": max_drawdown * 100,
-            "夏普比率": sharpe_ratio
+            "Ticker": ticker,
+            "Cumulative Return": total_return * 100,
+            "CAGR (Annual Return)": cagr * 100,
+            "Annualized Volatility": annual_volatility * 100,
+            "Max Drawdown": max_drawdown * 100,
+            "Sharpe Ratio": sharpe_ratio
         })
         
     df_result = pd.DataFrame(metrics)
     if not df_result.empty:
-        df_result.set_index("标的代码", inplace=True)
+        df_result.set_index("Ticker", inplace=True)
     return df_result
 
 

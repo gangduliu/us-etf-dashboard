@@ -114,6 +114,44 @@ def load_all_historical_returns(tickers):
     return df_combined.dropna()
 
 
+@st.cache_data(ttl=3600)
+def fetch_ticker_fundamentals(tickers):
+    """
+    Fetch Latest Price, Avg Daily Trading Volume (3M), and Expense Ratio (or N/A for individual stocks) using yfinance.
+    Returns DataFrame with Rows = Tickers, Columns = Metrics.
+    """
+    info_list = []
+    for ticker in tickers:
+        try:
+            yt = yf.Ticker(ticker)
+            info = yt.info
+            
+            price = info.get("currentPrice") or info.get("regularMarketPrice") or info.get("navPrice")
+            avg_vol = info.get("averageVolume") or info.get("averageDailyVolume3Month") or info.get("volume")
+            exp_ratio = info.get("expenseRatio") or info.get("netExpenseRatio")
+            
+            if exp_ratio is not None:
+                exp_ratio_str = f"{exp_ratio * 100:.2f}%" if exp_ratio < 1 else f"{exp_ratio:.2f}%"
+            else:
+                exp_ratio_str = "N/A (Stock)"
+                
+            info_list.append({
+                "Ticker": ticker,
+                "Latest Price": f"${price:,.2f}" if price else "N/A",
+                "Avg Vol (3M)": f"{avg_vol:,.0f}" if avg_vol else "N/A",
+                "Expense Ratio": exp_ratio_str
+            })
+        except Exception:
+            info_list.append({
+                "Ticker": ticker,
+                "Latest Price": "N/A",
+                "Avg Vol (3M)": "N/A",
+                "Expense Ratio": "N/A"
+            })
+    df = pd.DataFrame(info_list).set_index("Ticker")
+    return df
+
+
 def filter_by_range(df, range_str):
     if df is None or df.empty:
         return df
