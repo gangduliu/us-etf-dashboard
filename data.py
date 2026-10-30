@@ -7,11 +7,11 @@ from datetime import datetime, timedelta
 
 def check_is_etf(ticker_symbol, info):
     """
-    更稳健的 ETF 判断函数，包含多重兜底逻辑
+    More robust ETF detection function with multi-layer fallback logic
     """
     ticker_symbol = ticker_symbol.upper().strip()
     
-    # 1. 核心白名单兜底（防止云端 IP 被 Yahoo 屏蔽导致 info 为空时，主流 ETF 漏判）
+    # 1. Core whitelist fallback (prevents false negatives for mainstream ETFs when cloud IP is blocked by Yahoo resulting in empty info)
     known_etfs = {
         'VOO', 'SPY', 'QQQ', 'IVV', 'VTI', 'VEA', 'VWO', 'AGG', 'BND', 
         'GLD', 'IAU', 'IWM', 'EEM', 'VNQ', 'SCHD', 'ARKK', 'XLK', 'XLF'
@@ -19,7 +19,7 @@ def check_is_etf(ticker_symbol, info):
     if ticker_symbol in known_etfs:
         return True
 
-    # 2. 正常通过 info 字典判断
+    # 2. Normal check via info dictionary
     if info and isinstance(info, dict) and len(info) > 1:
         quote_type = info.get('quoteType', '')
         fund_family = info.get('fundFamily')
@@ -31,21 +31,21 @@ def check_is_etf(ticker_symbol, info):
 
 @st.cache_data(ttl=3600)
 def load_stock_or_etf_data(ticker_symbol):
-    """通用获取任意美股/ETF 的历史价格、info 字典以及分红数据"""
+    """Universal fetcher for historical prices, info dictionary, and dividend data for any US stock or ETF"""
     ticker_symbol = ticker_symbol.strip().upper()
     ticker = yf.Ticker(ticker_symbol)
     
-    # 1. 历史价格数据
+    # 1. Historical price data
     hist = ticker.history(period="max")
     if hist.empty:
-        raise ValueError(f"未能查询到代码为 '{ticker_symbol}' 的股票或 ETF 数据，请检查代码拼写是否正确。")
+        raise ValueError(f"Failed to fetch stock or ETF data for '{ticker_symbol}'. Please check if the ticker symbol is correct.")
     hist.index = hist.index.tz_localize(None) # type: ignore
     
-    # 2. 基本信息字典
+    # 2. Basic info dictionary
     info_raw = ticker.info or {}
     info = {k: v for k, v in info_raw.items() if isinstance(v, (int, float, str, bool, list, dict))}
 
-    #提取管理费率 (依次尝试多个可能存在的 key)
+    # Extract expense ratio (sequentially try multiple potential keys)
     raw_expense_ratio = (
         info.get('expenseRatio') or 
         info.get('netExpenseRatio') or 
@@ -55,12 +55,12 @@ def load_stock_or_etf_data(ticker_symbol):
 
     info['expenseRatio'] = raw_expense_ratio  # type: ignore
     
-    # 3. 历史分红记录
+    # 3. Historical dividend records
     dividends = ticker.dividends
     if not dividends.empty:
         dividends.index = dividends.index.tz_localize(None) # type: ignore
         
-    # 判断是否为 ETF
+    # Check if ETF
     is_etf = check_is_etf(ticker_symbol, info)
     
     return hist, info, dividends, is_etf
@@ -68,7 +68,7 @@ def load_stock_or_etf_data(ticker_symbol):
 
 @st.cache_data(ttl=86400)
 def load_etf_holdings_and_sectors(ticker_symbol):
-    """动态获取 ETF 行业分布与重仓股"""
+    """Dynamically fetch ETF sector distribution and top holdings"""
     ticker_symbol = ticker_symbol.strip().upper()
     ticker = yf.Ticker(ticker_symbol)
     sector_df = pd.DataFrame()
@@ -77,13 +77,13 @@ def load_etf_holdings_and_sectors(ticker_symbol):
     try:
         funds_data = ticker.funds_data
         
-        # 1. 行业分布
+        # 1. Sector distribution
         if hasattr(funds_data, 'sector_weightings') and funds_data.sector_weightings:
             sectors = funds_data.sector_weightings
             sector_df = pd.DataFrame(list(sectors.items()), columns=['Sector', 'Weight'])
             sector_df['Weight'] = sector_df['Weight'] * 100
         
-        # 2. 重仓股
+        # 2. Top holdings
         if hasattr(funds_data, 'top_holdings') and funds_data.top_holdings is not None:
             holdings_raw = funds_data.top_holdings.reset_index()
             holdings_raw.columns = ['Ticker', 'Company', 'Weight (%)']
@@ -97,7 +97,7 @@ def load_etf_holdings_and_sectors(ticker_symbol):
 
 @st.cache_data(ttl=3600)
 def load_all_historical_returns(tickers):
-    """获取指定代码组的纯收盘价历史数据 (供对比页使用)"""
+    """Fetch pure close price history for a given group of tickers (for comparison page)"""
     df_combined = pd.DataFrame()
     for t in tickers:
         try:
@@ -108,7 +108,7 @@ def load_all_historical_returns(tickers):
                 hist.index = hist.index.tz_localize(None) # type: ignore
                 df_combined[t] = hist['Close']
         except Exception as e:
-            print(f"获取 {t} 历史数据失败: {e}")
+            print(f"Failed to fetch historical data for {t}: {e}")
             pass
             
     return df_combined.dropna()
@@ -177,12 +177,12 @@ def get_range_years_limit(range_str):
 
 
 def get_asset_size_or_market_cap(info):
-    """自动判断提取市值 (Market Cap) 或基金规模 (AUM)"""
+    """Automatically extract Market Cap or Assets Under Management (AUM)"""
     val = info.get('totalAssets') or info.get('marketCap') or info.get('netAssets') or 0
     return val
 
 
-# 常见标的基准 TTM 股息率兜底表 (云端 API 彻底失效时使用)
+# Common baseline TTM dividend yield fallback table (used when cloud APIs fail completely)
 KNOWN_DIVIDEND_YIELDS = {
     "SCHD": 3.45,
     "VOO": 1.35,
@@ -201,18 +201,18 @@ KNOWN_DIVIDEND_YIELDS = {
 
 def calculate_ttm_dividend_yield(dividends, latest_price, info, ticker_symbol=""):
     """
-    三层递进算清股息率：
-    1. 优先使用近 12 个月实际派息总额 / 最新股价
-    2. 其次提取 info 字典中的各种 Yield 字段
-    3. 最后使用 Known 静态基准兜底
+    Three-tier progressive dividend yield calculation:
+    1. Prioritize total actual payouts over the past 12 months / latest price
+    2. Extract various Yield fields from the info dictionary
+    3. Fallback to known static baselines
     """
     ticker_symbol = ticker_symbol.strip().upper()
 
-    # 1. 第一层：基于近 365 天真实历史分红数据计算
+    # 1. Tier 1: Calculate based on real historical dividends over the past 365 days
     if dividends is not None and not dividends.empty and latest_price > 0:
         try:
             one_year_ago = datetime.now() - timedelta(days=365)
-            # 兼容带/不带时区的时间戳
+            # Handle timezone-aware/naive timestamps
             if dividends.index.tz is not None:
                 dividends.index = dividends.index.tz_localize(None)
             
@@ -225,7 +225,7 @@ def calculate_ttm_dividend_yield(dividends, latest_price, info, ticker_symbol=""
         except Exception:
             pass
 
-    # 2. 第二层：从 info 字典多种可能字段中提取
+    # 2. Tier 2: Extract from various potential fields in the info dictionary
     if info:
         raw_yield = (
             info.get('dividendYield') or 
@@ -233,11 +233,11 @@ def calculate_ttm_dividend_yield(dividends, latest_price, info, ticker_symbol=""
             info.get('yield') or 0.0
         )
         if isinstance(raw_yield, (int, float)) and raw_yield > 0:
-            # yfinance 部分字段返回小数 (如 0.0345)，部分返回百分比 (如 3.45)
+            # yfinance returns decimals for some fields (e.g., 0.0345) and percentages for others (e.g., 3.45)
             final_yield = raw_yield * 100.0 if raw_yield < 0.25 else raw_yield
             return round(final_yield, 2)
 
-    # 3. 第三层：已知标的静态基准兜底
+    # 3. Tier 3: Known static baseline fallback
     if ticker_symbol in KNOWN_DIVIDEND_YIELDS:
         return KNOWN_DIVIDEND_YIELDS[ticker_symbol]
 
@@ -246,7 +246,7 @@ def calculate_ttm_dividend_yield(dividends, latest_price, info, ticker_symbol=""
 
 @st.cache_data(ttl=900)
 def load_portfolio_market_data(tickers):
-    """批量获取持仓标的最新价格、前一日收盘价及强力计算出的股息率"""
+    """Batch fetch latest price, previous close price, and robustly calculated dividend yield for portfolio holdings"""
     data = {}
     for ticker_symbol in tickers:
         t = ticker_symbol.strip().upper()
@@ -262,18 +262,18 @@ def load_portfolio_market_data(tickers):
                 info = ticker.info or {}
                 dividends = ticker.dividends
                 
-                # 👈 使用强化版的股息率计算工具
+                # 👈 Use enhanced dividend yield calculation utility
                 div_yield = calculate_ttm_dividend_yield(dividends, latest_price, info, t)
 
                 data[t] = {
                     "latest_price": latest_price,
                     "prev_price": prev_price,
-                    "div_yield": div_yield, # 保证必定能拿到数值
+                    "div_yield": div_yield, # Ensure a numeric value is always obtained
                     "name": info.get('shortName') or info.get('longName') or t,
                     "quote_type": info.get('quoteType', 'EQUITY')
                 }
         except Exception:
-            # 异常时赋予静态兜底，防止崩溃
+            # Assign static fallback on exception to prevent crashes
             fallback_yield = KNOWN_DIVIDEND_YIELDS.get(t, 0.0)
             data[t] = {
                 "latest_price": 100.0,
@@ -287,7 +287,7 @@ def load_portfolio_market_data(tickers):
 
 @st.cache_data(ttl=86400)
 def get_portfolio_sector_breakdown(portfolio_df, market_data):
-    """穿透计算投资组合的综合行业配置分布 (%)"""
+    """Look-through calculation of comprehensive portfolio sector allocation distribution (%)"""
     sector_weights = {}
     total_portfolio_value = sum(
         row['shares'] * market_data.get(row['ticker'], {}).get('latest_price', row['cost_price'])
@@ -304,7 +304,7 @@ def get_portfolio_sector_breakdown(portfolio_df, market_data):
         position_value = shares * price
         position_weight = position_value / total_portfolio_value
 
-        # 获取单标的行业分布
+        # Get sector breakdown for single asset
         sector_df, _ = load_etf_holdings_and_sectors(t)
         if not sector_df.empty:
             for _, s_row in sector_df.iterrows():
@@ -312,8 +312,8 @@ def get_portfolio_sector_breakdown(portfolio_df, market_data):
                 sec_w = (s_row['Weight'] / 100) * position_weight * 100
                 sector_weights[sec_name] = sector_weights.get(sec_name, 0) + sec_w
         else:
-            # 个股或其他
-            sec_name = "其他 / 个股"
+            # Individual stock or other
+            sec_name = "Other / Stock"
             sector_weights[sec_name] = sector_weights.get(sec_name, 0) + (position_weight * 100)
 
     res_df = pd.DataFrame(list(sector_weights.items()), columns=['Sector', 'Weight'])
@@ -321,20 +321,20 @@ def get_portfolio_sector_breakdown(portfolio_df, market_data):
 
 
 def export_portfolio_to_json(df: pd.DataFrame) -> str:
-    """将持仓 DataFrame 转换为 JSON 格式字符串供下载"""
+    """Convert portfolio DataFrame to JSON formatted string for download"""
     valid_df = df.dropna(subset=['ticker'])
     records = valid_df.to_dict(orient="records")
     return json.dumps(records, ensure_ascii=False, indent=2)
 
 
 def export_portfolio_to_csv(df: pd.DataFrame) -> str:
-    """将持仓 DataFrame 转换为 CSV 格式字符串供下载"""
+    """Convert portfolio DataFrame to CSV formatted string for download"""
     valid_df = df.dropna(subset=['ticker'])
     return valid_df.to_csv(index=False, encoding='utf-8-sig')
 
 
 def load_portfolio_from_file(uploaded_file) -> pd.DataFrame:
-    """从用户上传的 CSV 或 JSON 文件解析并重建持仓 DataFrame"""
+    """Parse and rebuild portfolio DataFrame from user-uploaded CSV or JSON file"""
     filename = uploaded_file.name.lower()
     
     try:
@@ -344,16 +344,16 @@ def load_portfolio_from_file(uploaded_file) -> pd.DataFrame:
         elif filename.endswith(".csv"):
             df = pd.read_csv(uploaded_file)
         else:
-            st.error("❌ 不支持的文件格式，请上传 .json 或 .csv 文件！")
+            st.error("❌ Unsupported file format. Please upload a .json or .csv file!")
             return None # type: ignore
             
-        # 验证必要的列是否存在
+        # Verify necessary columns exist
         required_cols = {'ticker', 'shares', 'cost_price'}
         if not required_cols.issubset(set(df.columns)):
-            st.error("❌ 格式不匹配：文件缺少必要字段 (ticker, shares, cost_price)")
+            st.error("❌ Format mismatch: File is missing required fields (ticker, shares, cost_price)")
             return None # type: ignore
             
-        # 确保数据类型正确
+        # Ensure correct data types
         df['ticker'] = df['ticker'].astype(str).str.strip().str.upper()
         df['shares'] = pd.to_numeric(df['shares'], errors='coerce').fillna(1.0)
         df['cost_price'] = pd.to_numeric(df['cost_price'], errors='coerce').fillna(0.0)
@@ -364,5 +364,5 @@ def load_portfolio_from_file(uploaded_file) -> pd.DataFrame:
 
         return df.dropna(subset=['ticker'])
     except Exception as e:
-        st.error(f"❌ 读取持仓文件失败: {e}")
+        st.error(f"❌ Failed to read portfolio file: {e}")
         return None # type: ignore

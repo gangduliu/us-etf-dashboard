@@ -76,7 +76,7 @@ def inject_custom_css():
             letter-spacing: -0.02em;
         }}
 
-        /* Tab 列表容器：现代胶囊底座，自适应深浅色背景与边框 */
+        /* Tab List Container: Modern capsule base, adaptive background and border */
         .stTabs [data-baseweb="tab-list"] {{
             gap: 8px;
             background-color: var(--secondary-background-color);
@@ -86,7 +86,7 @@ def inject_custom_css():
             margin-bottom: 20px;
         }}
 
-        /* 单个 Tab 按钮：加入 0.25 秒贝塞尔平滑过渡，告别硬切 */
+        /* Individual Tab Button: 0.25s smooth bezier transition */
         .stTabs [data-baseweb="tab"] {{
             height: 40px;
             border-radius: 8px !important;
@@ -99,13 +99,13 @@ def inject_custom_css():
             padding: 0 16px !important;
         }}
 
-        /* 3. 鼠标悬停平滑泛起淡淡的青绿微光与文字变色 */
+        /* Hover effect: Smooth subtle glow and text color shift */
         .stTabs [data-baseweb="tab"]:hover {{
             background-color: rgba(15, 118, 110, 0.08) !important;
             color: var(--primary-color) !important;
         }}
 
-        /* 4. 选中状态丝滑填充主色调、加入细腻的立体阴影 */
+        /* Selected Tab state: Primary color fill with shadow */
         .stTabs [data-baseweb="tab"][aria-selected="true"] {{
             background-color: var(--primary-color) !important;
             color: #FFFFFF !important;
@@ -113,7 +113,7 @@ def inject_custom_css():
             box-shadow: 0 4px 12px rgba(15, 118, 110, 0.25);
         }}
 
-        /* 5. 彻底隐藏 Baseweb 默认生硬的底部横线指示条 */
+        /* Hide default bottom highlight bar */
         .stTabs [data-baseweb="tab-highlight"] {{
             display: none !important;
         }}
@@ -128,41 +128,41 @@ def inject_custom_css():
 
 
 def render_header(ticker_symbol, info, is_etf):
-    """动态生成 Header Banner"""
+    """Dynamically generate Header Banner"""
     name = info.get('longName') or info.get('shortName') or ticker_symbol
-    quote_type = "ETF 基金" if is_etf else "美股上市公司"
-    sector = info.get('sector') or info.get('category') or ("宽基/行业 ETF" if is_etf else "综合分类")
-    summary = info.get('longBusinessSummary', '暂无详细描述')
+    quote_type = "ETF Fund" if is_etf else "US Listed Company"
+    sector = info.get('sector') or info.get('category') or ("Broad/Sector ETF" if is_etf else "General Classification")
+    summary = info.get('longBusinessSummary', 'No detailed description available.')
     if len(summary) > 120:
         summary = summary[:120] + "..."
 
     st.markdown(f"""
     <div class="header-banner">
         <h1>📈 {name} ({ticker_symbol.upper()})</h1>
-        <p>类型：<b>{quote_type}</b> | 行业/领域：<b>{sector}</b> | {summary}</p>
+        <p>Type: <b>{quote_type}</b> | Sector/Category: <b>{sector}</b> | {summary}</p>
     </div>
     """, unsafe_allow_html=True)
 
 
 def render_kpi_cards(latest_price, price_change, pct_change, week_52_high, week_52_low, div_yield, info, is_etf, size_val):
-    """动态渲染 5 大 KPI 卡片 (区分个股与 ETF 关键指标)"""
+    """Dynamically render 5 main KPI cards (distinction between Stocks & ETFs)"""
     col1, col2, col3, col4, col5 = st.columns(5)
 
     col1.metric(
-        label="最新收盘价 (USD)",
+        label="Latest Price (USD)",
         value=f"${latest_price:.2f}",
         delta=f"{price_change:+.2f} ({pct_change:+.2f}%)"
     )
     col2.metric(
-        label="52 周最高 / 最低",
+        label="52-Week High / Low",
         value=f"${week_52_high:.2f}",
-        delta=f"最低: ${week_52_low:.2f}",
+        delta=f"Low: ${week_52_low:.2f}",
         delta_color="off"
     )
     col3.metric(
-        label="股息率 (TTM)",
+        label="Dividend Yield (TTM)",
         value=f"{div_yield:.2f}%",
-        delta="按近12月派息计算",
+        delta="Based on last 12M payouts",
         delta_color="off"
     )
 
@@ -171,43 +171,42 @@ def render_kpi_cards(latest_price, price_change, pct_change, week_52_high, week_
         if isinstance(expense, (int, float)) and expense < 0.01:
             expense = expense * 100
         col4.metric(
-            label="管理费率",
+            label="Expense Ratio",
             value=f"{expense}%" if expense else "N/A",
-            delta="指数基金费率",
+            delta="Index fund fee",
             delta_color="off"
         )
         col5.metric(
-            label="资产规模 (AUM)",
+            label="AUM",
             value=f"${size_val / 1e9:.1f} B" if size_val else "N/A",
-            delta="基金管理规模",
+            delta="Fund AUM",
             delta_color="off"
         )
     else:
         pe_ratio = info.get('trailingPE') or info.get('forwardPE')
         col4.metric(
-            label="市盈率 P/E (TTM)",
+            label="P/E Ratio (TTM)",
             value=f"{pe_ratio:.1f}" if pe_ratio else "N/A",
-            delta="静态/滚动市盈率",
+            delta="Trailing / Forward P/E",
             delta_color="off"
         )
         col5.metric(
-            label="总市值 (Market Cap)",
+            label="Market Cap",
             value=f"${size_val / 1e9:.1f} B" if size_val else "N/A",
-            delta="企业资产规模",
+            delta="Total valuation",
             delta_color="off"
         )
     st.write("")
 
 
 def render_advice_card(advice):
-    """渲染升级后的多因子量化交易决策 Banner (已包含建议买入/卖出价)"""
+    """Render multi-factor quant trading decision banner (includes suggested buy/sell price)"""
     
-    # 从返回字典中获取建议价格，若无则显示暂无
     buy_price = advice.get('suggested_buy_price', None)
     sell_price = advice.get('suggested_sell_price', None)
     
-    buy_str = f"${buy_price:.2f}" if buy_price is not None else "暂无"
-    sell_str = f"${sell_price:.2f}" if sell_price is not None else "暂无"
+    buy_str = f"${buy_price:.2f}" if buy_price is not None else "N/A"
+    sell_str = f"${sell_price:.2f}" if sell_price is not None else "N/A"
 
     st.markdown(f"""
     <div style="background-color: {advice['badge_bg']}; border-left: 5px solid {advice['badge_color']}; padding: 16px 20px; border-radius: 8px; margin-bottom: 20px;">
@@ -217,24 +216,24 @@ def render_advice_card(advice):
         <div style="font-size: 0.9rem; color: #334155; line-height: 1.5;">
             {advice['desc']}
         </div>
-        <!-- 核心价格与评分 (取消白色独立背景框，通过上下微细分割线与底色融为一体) -->
+        <!-- Target Price & Score Display -->
         <div style="display: flex; gap: 16px; align-items: center; padding: 10px 0;">
             <div style="flex: 1;">
-                <div style="font-size: 0.75rem; color: #64748B; font-weight: 500;">🟢 建议买入价</div>
+                <div style="font-size: 0.75rem; color: #64748B; font-weight: 500;">🟢 Suggested Buy Price</div>
                 <div style="font-size: 1.0rem; font-weight: 700; color: #166534; margin-top: 2px;">{buy_str}</div>
             </div>
             <div style="flex: 1;">
-                <div style="font-size: 0.75rem; color: #64748B; font-weight: 500;">🔴 建议卖出价</div>
+                <div style="font-size: 0.75rem; color: #64748B; font-weight: 500;">🔴 Suggested Sell Price</div>
                 <div style="font-size: 1.0rem; font-weight: 700; color: #991B1B; margin-top: 2px;">{sell_str}</div>
             </div>
         </div>
         <div style="font-size: 0.82rem; color: #64748B; display: flex; flex-wrap: wrap; gap: 16px;">
-            <span>量化综合评分: <b>{advice.get('score', 0):+} 分</b></span>
-            <span>200日均线 (MA200): <b>${advice['ma200']:.2f}</b></span>
-            <span>MA200 乖离率: <b>{advice['ma_bias']:+.1f}%</b></span>
+            <span>Quant Score: <b>{advice.get('score', 0):+} pts</b></span>
+            <span>MA200: <b>${advice['ma200']:.2f}</b></span>
+            <span>MA200 Bias: <b>{advice['ma_bias']:+.1f}%</b></span>
             <span>RSI(14): <b>{advice['rsi']:.1f}</b></span>
-            <span>布林带 %B: <b>{advice.get('pct_b', 50):.1f}%</b></span>
-            <span>52周分位数: <b>{advice['position_52w']:.1f}%</b></span>
+            <span>Bollinger %B: <b>{advice.get('pct_b', 50):.1f}%</b></span>
+            <span>52W Percentile: <b>{advice['position_52w']:.1f}%</b></span>
         </div>
     </div>
     """, unsafe_allow_html=True)
@@ -245,7 +244,7 @@ def render_advanced_comparison_chart(df_compare, y_axis_title):
         df_compare, 
         x=df_compare.index, 
         y=df_compare.columns,
-        labels={'value': y_axis_title, 'Date': '交易日期', 'variable': '标的代码'},
+        labels={'value': y_axis_title, 'Date': 'Trading Date', 'variable': 'Ticker'},
         template="plotly",
     )
     fig.update_traces(line_width=2.5)
@@ -263,50 +262,50 @@ def render_advanced_comparison_chart(df_compare, y_axis_title):
 
 
 def render_portfolio_summary_cards(p_metrics):
-    """渲染组合顶部的 4 大概览 KPI 卡片（增加外边距与排版空间）"""
+    """Render top 4 summary KPI cards for portfolio"""
     col1, col2, col3, col4 = st.columns(4)
     
     col1.metric(
-        label="组合总市值 (USD)",
+        label="Total Market Value (USD)",
         value=f"${p_metrics['total_market_value']:,.2f}",
-        delta=f"总成本: ${p_metrics['total_cost']:,.2f}",
+        delta=f"Total Cost: ${p_metrics['total_cost']:,.2f}",
         delta_color="off"
     )
     
     profit_color = "normal" if p_metrics['total_profit'] >= 0 else "inverse"
     col2.metric(
-        label="累计浮盈 / 浮亏",
+        label="Total Unrealized P&L",
         value=f"${p_metrics['total_profit']:+,.2f}",
         delta=f"{p_metrics['total_profit_pct']:+.2f}%",
     )
     
     daily_color = "normal" if p_metrics['daily_gain_loss'] >= 0 else "inverse"
     col3.metric(
-        label="预估当日盈亏",
+        label="Est. Daily Gain/Loss",
         value=f"${p_metrics['daily_gain_loss']:+,.2f}",
         delta=f"{p_metrics['daily_gain_loss_pct']:+.2f}%",
     )
     
     pos_count = len(p_metrics['details_df'])
     col4.metric(
-        label="持仓标的数量",
-        value=f"{pos_count} 只",
-        delta="资产分散配置",
+        label="Holdings Count",
+        value=f"{pos_count} Assets",
+        delta="Diversified Allocation",
         delta_color="off"
     )
     st.markdown("<div style='margin-bottom: 12px;'></div>", unsafe_allow_html=True)
 
 
 def render_portfolio_charts(p_metrics, sector_p_df):
-    """优化组合图表排版，彻底解决图例与饼图重叠遮挡的问题"""
+    """Render portfolio charts with optimized legend position"""
     col_p1, col_p2 = st.columns(2)
     
     with col_p1:
-        st.markdown('<div class="section-title">🍰 持仓标的资产占比 (%)</div>', unsafe_allow_html=True)
+        st.markdown('<div class="section-title">🍰 Asset Allocation (%)</div>', unsafe_allow_html=True)
         fig_holdings_pie = px.pie(
             p_metrics['details_df'],
-            values='当前总市值 ($)',
-            names='代码',
+            values='Current Market Value ($)',
+            names='Ticker',
             hole=0.45,
             template="plotly",
             color_discrete_sequence=['#0F766E', '#14B8A6', '#2DD4BF', '#0284C7', '#38BDF8', '#818CF8']
@@ -314,14 +313,12 @@ def render_portfolio_charts(p_metrics, sector_p_df):
         fig_holdings_pie.update_traces(
             textposition='inside', 
             textinfo='percent',
-            hovertemplate="代码: <b>%{label}</b><br>占比: %{percent}<br>市值: <b>$%{value:,.2f}</b><extra></extra>"
+            hovertemplate="Ticker: <b>%{label}</b><br>Share: %{percent}<br>Market Value: <b>$%{value:,.2f}</b><extra></extra>"
         )
         fig_holdings_pie.update_layout(
-            # 关键调整 1: 预留充足的底部边距 (b=80)，防止底部的图例与饼图重叠
             margin=dict(l=20, r=20, t=20, b=80), 
             height=360, 
             showlegend=True,
-            # 关键调整 2: 精准控制图例在底部居中，并且位于饼图绘制区域下方
             legend=dict(
                 orientation="h", 
                 yanchor="top", 
@@ -335,7 +332,7 @@ def render_portfolio_charts(p_metrics, sector_p_df):
         st.plotly_chart(fig_holdings_pie, use_container_width=True)
 
     with col_p2:
-        st.markdown('<div class="section-title">🧱 组合穿透综合行业配置 (%)</div>', unsafe_allow_html=True)
+        st.markdown('<div class="section-title">🧱 Look-Through Sector Breakdown (%)</div>', unsafe_allow_html=True)
         if not sector_p_df.empty:
             fig_sec_pie = px.pie(
                 sector_p_df,
@@ -348,14 +345,12 @@ def render_portfolio_charts(p_metrics, sector_p_df):
             fig_sec_pie.update_traces(
                 textposition='inside', 
                 textinfo='percent',
-                hovertemplate="行业: <b>%{label}</b><br>穿透权重: <b>%{value:.1f}%</b><extra></extra>"
+                hovertemplate="Sector: <b>%{label}</b><br>Weight: <b>%{value:.1f}%</b><extra></extra>"
             )
             fig_sec_pie.update_layout(
-                # 关键调整 1: 预留充足的底部边距 (b=80)
                 margin=dict(l=20, r=20, t=20, b=80), 
                 height=360, 
                 showlegend=True,
-                # 关键调整 2: 下插图例置于饼图正下方
                 legend=dict(
                     orientation="h", 
                     yanchor="top", 
@@ -368,36 +363,31 @@ def render_portfolio_charts(p_metrics, sector_p_df):
             )
             st.plotly_chart(fig_sec_pie, use_container_width=True)
         else:
-            st.info("暂无组合行业穿透数据。")
+            st.info("No look-through sector breakdown data available.")
 
 
 def render_portfolio_advisory(suggestions):
-    """渲染投资组合健康诊断与建议"""
-    st.markdown('<div class="section-title">💡 投资组合健康诊断与优化建议</div>', unsafe_allow_html=True)
+    """Render portfolio health diagnostic & recommendation cards"""
+    st.markdown('<div class="section-title">💡 Portfolio Health Diagnostic & Advisory</div>', unsafe_allow_html=True)
     
     for item in suggestions:
         if item['level'] == "DANGER":
-            # 红色高危卡片
             border_color = "#EF4444"
             bg_color = "rgba(239, 68, 68, 0.15)"
             title_color = "#F87171"
         elif item['level'] == "WARNING":
-            # 黄/橙色预警卡片
             border_color = "#F59E0B"
             bg_color = "rgba(245, 158, 11, 0.15)"
             title_color = "#FBBF24"
         elif item['level'] == "SUCCESS":
-            # 绿色健康卡片
             border_color = "#10B981"
             bg_color = "rgba(16, 185, 129, 0.15)"
             title_color = "#34D399"
         else: # INFO
-            # 蓝色信息卡片
             border_color = "#3B82F6"
             bg_color = "rgba(59, 130, 246, 0.15)"
             title_color = "#60A5FA"
 
-        # 使用 CSS 变量 var(--text-color) 确保描述文本在亮色/暗色模式下均拥有最高清晰度与对比度
         st.markdown(f"""
         <div style="background-color: {bg_color}; border-left: 5px solid {border_color}; padding: 14px 18px; border-radius: 8px; margin-bottom: 12px; backdrop-filter: blur(4px);">
             <div style="font-size: 0.95rem; font-weight: 700; color: {title_color}; margin-bottom: 6px;">
@@ -411,64 +401,60 @@ def render_portfolio_advisory(suggestions):
 
 
 def render_rebalance_dashboard(rebalance_df, total_current_val, target_total_val, new_cash):
-    """渲染一键再平衡计算面板与可视化交易指令"""
-    st.markdown('<div class="section-title">⚖️ 投资组合一键再平衡计算器 (Rebalance Assistant)</div>', unsafe_allow_html=True)
+    """Render rebalance calculator dashboard & trade actions"""
+    st.markdown('<div class="section-title">⚖️ Portfolio Rebalance Assistant</div>', unsafe_allow_html=True)
     
-    # 顶部状态卡片
     col1, col2, col3 = st.columns(3)
-    col1.metric("当前组合总市值", f"${total_current_val:,.2f}")
-    col2.metric("计划新增入金", f"${new_cash:,.2f}")
-    col3.metric("再平衡后预计总资产", f"${target_total_val:,.2f}")
+    col1.metric("Current Portfolio Value", f"${total_current_val:,.2f}")
+    col2.metric("Planned Cash Inflow", f"${new_cash:,.2f}")
+    col3.metric("Est. Total Value Post-Rebalance", f"${target_total_val:,.2f}")
 
     st.markdown("<br>", unsafe_allow_html=True)
-    st.markdown("##### 🛒 调仓交易指令明细")
+    st.markdown("##### 🛒 Rebalance Trade Instructions")
     
     if not rebalance_df.empty:
-        # 显示目标权重校验警告
-        total_target_pct = rebalance_df["目标权重 (%)"].sum()
+        total_target_pct = rebalance_df["Target Weight (%)"].sum() if "Target Weight (%)" in rebalance_df.columns else rebalance_df.get("目标权重 (%)", pd.Series([100])).sum()
         if abs(total_target_pct - 100.0) > 0.1:
-            st.warning(f"⚠️ 当前目标权重之和为 **{total_target_pct:.1f}%**，建议调整编辑表格使目标权重之和等于 **100%**。")
+            st.warning(f"⚠️ Current target weight sum is **{total_target_pct:.1f}%**. Consider adjusting so the sum equals **100%**.")
         else:
-            st.success("✅ 目标权重设定完美（合计 100%）。")
+            st.success("✅ Target weight settings are valid (Total: 100%).")
 
         st.dataframe(
             rebalance_df,
             column_config={
-                "代码": st.column_config.TextColumn("代码", width="small"),
-                "当前股价 ($)": st.column_config.NumberColumn("当前股价", format="$%.2f"),
-                "当前市值 ($)": st.column_config.NumberColumn("当前市值", format="$%.2f"),
-                "当前实际权重 (%)": st.column_config.NumberColumn("实际权重", format="%.1f%%"),
-                "目标权重 (%)": st.column_config.NumberColumn("目标权重", format="%.1f%%"),
-                "权重偏差 (%)": st.column_config.NumberColumn("偏差 (%)", format="%+.1f%%"),
-                "再平衡建议动作": st.column_config.TextColumn("建议动作", width="medium"),
-                "调整金额 ($)": st.column_config.NumberColumn("建议交易金额", format="$%.2f"),
-                "调整股数": st.column_config.NumberColumn("建议交易股数", format="%.2f 股")
+                "Ticker": st.column_config.TextColumn("Ticker", width="small"),
+                "Current Price ($)": st.column_config.NumberColumn("Current Price", format="$%.2f"),
+                "Current Value ($)": st.column_config.NumberColumn("Current Value", format="$%.2f"),
+                "Actual Weight (%)": st.column_config.NumberColumn("Actual Weight", format="%.1f%%"),
+                "Target Weight (%)": st.column_config.NumberColumn("Target Weight", format="%.1f%%"),
+                "Deviation (%)": st.column_config.NumberColumn("Deviation (%)", format="%+.1f%%"),
+                "Action": st.column_config.TextColumn("Action", width="medium"),
+                "Trade Amount ($)": st.column_config.NumberColumn("Trade Amount", format="$%.2f"),
+                "Trade Shares": st.column_config.NumberColumn("Trade Shares", format="%.2f shares")
             },
             hide_index=True,
             use_container_width=True
         )
     else:
-        st.info("暂无有效持仓数据进行再平衡计算。")
+        st.info("No valid holdings data available for rebalance calculation.")
 
 
 def render_dividend_dashboard(div_metrics):
-    """渲染股息现金流预估看板与月度现金流柱状图"""
-    st.markdown('<div class="section-title">💵 投资组合被动现金流与股息预估 (Dividend Flow)</div>', unsafe_allow_html=True)
+    """Render dividend cashflow dashboard & monthly projections"""
+    st.markdown('<div class="section-title">💵 Passive Income & Dividend Flow</div>', unsafe_allow_html=True)
     
-    # 顶部 3 大现金流核心指标
     col1, col2, col3 = st.columns(3)
-    col1.metric("组合穿透加权股息率", f"{div_metrics['portfolio_div_yield']:.2f}%")
-    col2.metric("预计年化被动现金流", f"${div_metrics['total_annual_cashflow']:,.2f}")
-    col3.metric("预计平均月度现金流", f"${div_metrics['total_annual_cashflow'] / 12:,.2f}")
+    col1.metric("Weighted Portfolio Div Yield", f"{div_metrics['portfolio_div_yield']:.2f}%")
+    col2.metric("Est. Annual Passive Cashflow", f"${div_metrics['total_annual_cashflow']:,.2f}")
+    col3.metric("Est. Average Monthly Cashflow", f"${div_metrics['total_annual_cashflow'] / 12:,.2f}")
 
     st.markdown("<br>", unsafe_allow_html=True)
     
-    # 月度现金流预估柱状图
-    st.markdown("##### 📅 预估未来 12 个月领息日历 ($)")
+    st.markdown("##### 📅 Projected 12-Month Dividend Schedule ($)")
     fig_div_bar = px.bar(
         div_metrics['monthly_df'],
-        x="月份",
-        y="预计领息 ($)",
+        x="Month" if "Month" in div_metrics['monthly_df'].columns else "月份",
+        y="Est. Dividends ($)" if "Est. Dividends ($)" in div_metrics['monthly_df'].columns else "预计领息 ($)",
         text_auto=".2f", # type: ignore
         template="plotly"
     )
@@ -488,16 +474,15 @@ def render_dividend_dashboard(div_metrics):
     )
     st.plotly_chart(fig_div_bar, use_container_width=True)
 
-    # 各标的派息明细表
-    st.markdown("##### 📋 各标的股息贡献明细")
+    st.markdown("##### 📋 Dividend Breakdown by Asset")
     st.dataframe(
         div_metrics['breakdown_df'],
         column_config={
-            "代码": st.column_config.TextColumn("代码", width="small"),
-            "当前持仓市值 ($)": st.column_config.NumberColumn("持仓市值", format="$%.2f"),
-            "股息率 (TTM %)": st.column_config.NumberColumn("股息率", format="%.2f%%"),
-            "预计年领股息 ($)": st.column_config.NumberColumn("预计年股息", format="$%.2f"),
-            "历史派息月份": st.column_config.TextColumn("派息月份", width="medium")
+            "Ticker": st.column_config.TextColumn("Ticker", width="small"),
+            "Market Value ($)": st.column_config.NumberColumn("Market Value", format="$%.2f"),
+            "Dividend Yield (TTM %)": st.column_config.NumberColumn("Dividend Yield", format="%.2f%%"),
+            "Est. Annual Dividend ($)": st.column_config.NumberColumn("Est. Annual Div", format="$%.2f"),
+            "Payout Months": st.column_config.TextColumn("Payout Months", width="medium")
         },
         hide_index=True,
         use_container_width=True,

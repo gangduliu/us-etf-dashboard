@@ -10,24 +10,24 @@ def calculate_ticker_performance_metrics(df):
     start_price = df['Close'].iloc[0]
     end_price = df['Close'].iloc[-1]
     
-    # 1. 累计总回报率
+    # 1. Total Cumulative Return
     total_return = (end_price - start_price) / start_price
     
-    # 2. 年化回报率 (CAGR)
+    # 2. Compound Annual Growth Rate (CAGR)
     days = (df.index[-1] - df.index[0]).days
     years = days / 365.25
     cagr = ((end_price / start_price) ** (1 / years) - 1) if years > 0 else 0.0
     
-    # 3. 最大回撤 (Maximum Drawdown)
+    # 3. Maximum Drawdown
     roll_max = df['Close'].cummax()
     drawdown = (df['Close'] - roll_max) / roll_max
-    max_drawdown = drawdown.min()  # 负数
+    max_drawdown = drawdown.min()  # Negative value
     
     return total_return, cagr, max_drawdown
 
 
 def calculate_rsi(prices, period=14):
-    """计算 RSI 指标"""
+    """Calculate RSI indicator"""
     delta = prices.diff()
     gain = (delta.where(delta > 0, 0)).rolling(window=period).mean()
     loss = (-delta.where(delta < 0, 0)).rolling(window=period).mean()
@@ -38,15 +38,15 @@ def calculate_rsi(prices, period=14):
 
 def analyze_trading_signal(hist, latest_price, week_52_high, week_52_low, div_yield, ticker_symbol=""):
     """
-    机构级多因子量化交易信号模型 (Multi-Factor Score)
-    综合考量: MA200乖离率、MA20/50均线趋势、RSI超买超卖、52周位置及布林带%B
-    新增：建议买入价与建议卖出价计算
+    Institutional multi-factor quant trading signal model (Multi-Factor Score)
+    Considers: MA200 bias, MA20/50 trend, RSI overbought/oversold, 52-week position, and Bollinger %B
+    Includes: Suggested buy price and sell price calculations
     """
     if hist.empty or len(hist) < 20:
         return {
             "type": "HOLD",
-            "title": "🔵 数据不足 / 保持观察",
-            "desc": "暂无足够历史数据计算量化信号。",
+            "title": "🔵 Insufficient Data / Keep Observing",
+            "desc": "Insufficient historical data to calculate quantitative signals.",
             "ma200": latest_price, "position_52w": 50.0, "ma_bias": 0.0, "rsi": 50.0,
             "suggested_buy_price": round(latest_price * 0.95, 2),
             "suggested_sell_price": round(latest_price * 1.05, 2),
@@ -55,101 +55,100 @@ def analyze_trading_signal(hist, latest_price, week_52_high, week_52_low, div_yi
 
     close_series = hist['Close']
 
-    # 1. 计算核心量化指标
+    # 1. Calculate core quant metrics
     ma20 = close_series.tail(20).mean()
     ma50 = close_series.tail(50).mean() if len(close_series) >= 50 else ma20
     ma200 = close_series.tail(200).mean() if len(close_series) >= 200 else close_series.mean()
     
-    # 乖离率 (%)
+    # Bias (%)
     ma200_bias = ((latest_price - ma200) / ma200) * 100
     ma50_bias = ((latest_price - ma50) / ma50) * 100
     
-    # 52周相对分位数
+    # 52-week relative position
     range_52 = week_52_high - week_52_low
     position_52w = ((latest_price - week_52_low) / range_52 * 100) if range_52 > 0 else 50.0
 
     # RSI(14)
     rsi = calculate_rsi(close_series, 14)
 
-    # 布林带 (20, 2) 与 %B 指标
+    # Bollinger Bands (20, 2) & %B
     std20 = close_series.tail(20).std()
     upper_band = ma20 + (2 * std20)
     lower_band = ma20 - (2 * std20)
     pct_b = ((latest_price - lower_band) / (upper_band - lower_band)) if (upper_band - lower_band) > 0 else 0.5
 
-    # 建议买入价：取布林带下轨、MA20 或当前价格下方合理支撑的较低者
+    # Suggested buy price: lower of lower band, 96% of latest price, or MA20 support
     suggested_buy_price = round(max(lower_band, min(latest_price * 0.96, ma20)), 2)
     
-    # 建议卖出价（止盈/压力位）：取布林带上轨或合理溢价目标
+    # Suggested sell price: upper band or target target premium
     suggested_sell_price = round(min(upper_band, max(latest_price * 1.06, ma20 * 1.05)), 2)
 
-    # 2. 多因子打分逻辑 (Score range: -100 ~ +100)
-    # 正分偏买入 (低估/支撑)，负分偏卖出/止盈 (过热/压力)
+    # 2. Multi-factor scoring logic (Score range: -100 ~ +100)
     score = 0
 
-    # 因子 A: MA200 乖离率 (-30 ~ +30 分)
+    # Factor A: MA200 Bias (-30 ~ +30 pts)
     if ma200_bias < -10:
-        score += 30  # 深度回调，强超买机会
+        score += 30  # Deep pullback, strong buy opportunity
     elif ma200_bias < -3:
-        score += 15  # 均线下方，具备性价比
+        score += 15  # Below moving average, good value
     elif ma200_bias > 20:
-        score -= 30  # 严重偏离均线，极度过热
+        score -= 30  # Severely overextended, extreme overheat
     elif ma200_bias > 12:
-        score -= 15  # 乖离率偏高
+        score -= 15  # High bias
 
-    # 因子 B: RSI 超买超卖 (-25 ~ +25 分)
+    # Factor B: RSI Overbought/Oversold (-25 ~ +25 pts)
     if rsi < 30:
-        score += 25  # RSI 严重超卖
+        score += 25  # RSI severely oversold
     elif rsi < 42:
-        score += 12  # RSI 弱势区
+        score += 12  # RSI weak zone
     elif rsi > 75:
-        score -= 25  # RSI 严重超买
+        score -= 25  # RSI severely overbought
     elif rsi > 65:
-        score -= 12  # RSI 进入强势高位
+        score -= 12  # RSI entering strong upper zone
 
-    # 因子 C: 布林带 %B 位置 (-20 ~ +20 分)
+    # Factor C: Bollinger %B (-20 ~ +20 pts)
     if pct_b < 0.05:
-        score += 20  # 触及/跌破布林下轨
+        score += 20  # Touching/below lower band
     elif pct_b > 0.95:
-        score -= 20  # 突破布林上轨
+        score -= 20  # Breaking above upper band
 
-    # 因子 D: 均线排列趋势确认 (-15 ~ +15 分)
+    # Factor D: Moving Average Alignment (-15 ~ +15 pts)
     if ma20 > ma50 and ma50 > ma200:
-        # 多头排列：强趋势中提高对超买的容忍度 (+10 动量加分)
+        # Bullish alignment: Strong momentum
         score += 10
     elif ma20 < ma50 and ma50 < ma200:
-        # 空头排列：顺势看空 (-10 分)
+        # Bearish alignment
         score -= 10
 
-    # 3. 结果决策映射
+    # 3. Signal Decision Mapping
     if score >= 35:
         signal_type = "BUY_STRONG"
-        signal_title = f"🟢 强买入 / 黄金加仓期 (综合评分: +{score})"
-        signal_desc = f"价格跌破或贴近关键支撑区（MA200 乖离率 {ma200_bias:+.1f}%，RSI 为 {rsi:.1f}），布林带逼近下轨。历史概率显示当前具备极高风险收益比，建议分批加仓或分批建仓。"
+        signal_title = f"🟢 Strong Buy / Prime Accumulation Window (Score: +{score})"
+        signal_desc = f"Price is near key support levels (MA200 bias {ma200_bias:+.1f}%, RSI at {rsi:.1f}), approaching lower Bollinger Band. Favorable risk-reward ratio; consider building or adding positions in tranches."
         badge_color = "#166534"
         badge_bg = "#DCFCE7"
     elif score >= 10:
         signal_type = "BUY_WEAK"
-        signal_title = f"🟢 分批定投 / 逢低适度关注 (综合评分: +{score})"
-        signal_desc = f"指标整体处于合理或偏低估区间（RSI {rsi:.1f}），估值并未过热。适合常态化定投或分批小额买入。"
+        signal_title = f"🟢 Dollar-Cost Average / Moderate Dip Buy (Score: +{score})"
+        signal_desc = f"Indicators are in reasonable or undervalued range (RSI {rsi:.1f}) without overheating. Suitable for regular DCA or incremental buying."
         badge_color = "#15803D"
         badge_bg = "#F0FDF4"
     elif score <= -35:
         signal_type = "SELL_STRONG"
-        signal_title = f"🔴 强减仓 / 分批止盈提示 (综合评分: {score})"
-        signal_desc = f"价格显著偏离 200 日均线（乖离率 {ma200_bias:+.1f}%），且 RSI ({rsi:.1f}) 处于极端超买区，触及布林上轨。短期回调风险剧增，建议分批锁定利润或通过资产再平衡降低仓位。"
+        signal_title = f"🔴 Strong Trim / Profit Taking Alert (Score: {score})"
+        signal_desc = f"Price is significantly stretched above 200-day MA (bias {ma200_bias:+.1f}%) and RSI ({rsi:.1f}) is in extreme overbought territory near upper Bollinger Band. Elevated risk of short-term pullbacks; consider locking in profits or rebalancing."
         badge_color = "#991B1B"
         badge_bg = "#FEE2E2"
     elif score <= -10:
         signal_type = "SELL_WEAK"
-        signal_title = f"🟡 阶段高位 / 暂停追高 (综合评分: {score})"
-        signal_desc = f"价格接近 52 周高点（分位数 {position_52w:.1f}%），乖离率放宽。不建议此时大额追高，偏好稳健的投资者可暂停加仓或小幅再平衡。"
+        signal_title = f"🟡 Local High / Pause Chasing (Score: {score})"
+        signal_desc = f"Price is near 52-week high (percentile {position_52w:.1f}%) with extended bias. Avoid buying aggressively at these levels; conservative investors may pause buying or perform light rebalancing."
         badge_color = "#9A3412"
         badge_bg = "#FFEDD5"
     else:
         signal_type = "HOLD"
-        signal_title = f"🔵 趋势健康 / 正常持有 (综合评分: {score:+} )"
-        signal_desc = f"价格在 200 日均线 (${ma200:.2f}) 上方平稳运行（乖离率 {ma200_bias:+.1f}%），各项指标处于均衡区间。建议保持既定投资策略，正常持有。"
+        signal_title = f"🔵 Healthy Trend / Hold Position (Score: {score:+} )"
+        signal_desc = f"Price is moving smoothly above 200-day MA (${ma200:.2f}) with bias of {ma200_bias:+.1f}%. Metrics remain balanced. Maintain existing portfolio strategy."
         badge_color = "#1E40AF"
         badge_bg = "#DBEAFE"
 
@@ -172,7 +171,6 @@ def analyze_trading_signal(hist, latest_price, week_52_high, week_52_low, div_yi
 
 def calculate_performance_metrics(df_prices):
     metrics = []
-    # 假设一年按 252 个交易日计算
     trading_days = 252
     
     for ticker in df_prices.columns:
@@ -180,24 +178,24 @@ def calculate_performance_metrics(df_prices):
         if len(series) < 2:
             continue
             
-        # 1. 累计收益率
+        # 1. Total Cumulative Return
         total_return = (series.iloc[-1] / series.iloc[0]) - 1
         
-        # 2. 年化收益率 (CAGR)
+        # 2. Compound Annual Growth Rate (CAGR)
         days = (series.index[-1] - series.index[0]).days
         years = days / 365.25
         cagr = (series.iloc[-1] / series.iloc[0]) ** (1 / years) - 1 if years > 0 else 0
         
-        # 3. 年化波动率
+        # 3. Annualized Volatility
         daily_returns = series.pct_change().dropna()
         annual_volatility = daily_returns.std() * np.sqrt(trading_days)
         
-        # 4. 最大回撤 (Max Drawdown)
+        # 4. Max Drawdown
         rolling_max = series.cummax()
         drawdown = (series - rolling_max) / rolling_max
         max_drawdown = drawdown.min()
         
-        # 5. 夏普比率 (假设无风险利率为 4% / 0.04)
+        # 5. Sharpe Ratio (assuming risk-free rate of 4.0% / 0.04)
         risk_free_rate = 0.04
         sharpe_ratio = (cagr - risk_free_rate) / annual_volatility if annual_volatility > 0 else 0
         
@@ -217,7 +215,7 @@ def calculate_performance_metrics(df_prices):
 
 
 def calculate_portfolio_metrics(portfolio_df, market_data):
-    """计算投资组合的总资产、总成本、累计浮盈浮亏及当日盈亏"""
+    """Calculate portfolio total market value, total cost basis, cumulative profit/loss, and daily gain/loss"""
     total_cost = 0.0
     total_market_value = 0.0
     total_prev_value = 0.0
@@ -249,17 +247,17 @@ def calculate_portfolio_metrics(portfolio_df, market_data):
         daily_gain_loss += pos_daily
         
         detailed_rows.append({
-            "代码": t,
-            "名称": m_info.get('name', t),
-            "持仓股数": shares,
-            "持仓成本价 ($)": cost_price,
-            "当前现价 ($)": latest_price,
-            "当前总市值 ($)": pos_value,
-            "持仓成本总额 ($)": pos_cost,
-            "累计盈亏 ($)": pos_profit,
-            "累计收益率 (%)": pos_profit_pct,
-            "当日盈亏 ($)": pos_daily,
-            "当日收益率 (%)": pos_daily_pct
+            "Ticker": t,
+            "Name": m_info.get('name', t),
+            "Shares": shares,
+            "Cost Basis ($)": cost_price,
+            "Current Price ($)": latest_price,
+            "Current Market Value ($)": pos_value,
+            "Total Cost ($)": pos_cost,
+            "Cumulative P&L ($)": pos_profit,
+            "Cumulative Return (%)": pos_profit_pct,
+            "Daily Gain/Loss ($)": pos_daily,
+            "Daily Return (%)": pos_daily_pct
         })
 
     total_profit = total_market_value - total_cost
@@ -277,14 +275,14 @@ def calculate_portfolio_metrics(portfolio_df, market_data):
     }
 
 
-# 常见宽基 ETF 与 行业/高股息 ETF 识别分类库
+# Broad market ETFs and sector/dividend ETF classification sets
 BROAD_MARKET_ETFS = {"VOO", "VT", "SPY", "IVV", "QQQ", "VTI", "SCHB", "SPYM"}
 SECTOR_THEME_ETFS = {"VGT", "SCHD", "XLE", "XLF", "XLK", "XLV", "ARKK", "SMH", "SOXX", "JEPI", "JEPQ", "IWM"}
 
 def analyze_portfolio_health(portfolio_df, market_data, sector_p_df):
     """
-    风格区分版诊断算法
-    根据 宽基 ETF / 行业及主题 ETF / 单股票 采用不同的集中度阈值
+    Asset-style differentiated diagnostic algorithm
+    Applies custom concentration thresholds for Broad ETFs / Sector ETFs / Single Stocks
     """
     suggestions = []
     total_val = 0.0
@@ -303,62 +301,61 @@ def analyze_portfolio_health(portfolio_df, market_data, sector_p_df):
 
     pos_pcts = {t: (v / total_val * 100) for t, v in pos_weights.items()}
 
-    # 1. 区分资产风格判定集中度
+    # 1. Style-differentiated concentration analysis
     for t, pct in pos_pcts.items():
         m_info = market_data.get(t, {})
         quote_type = m_info.get('quote_type', 'EQUITY').upper()
         
-        # 判断资产分类
         is_broad_etf = t in BROAD_MARKET_ETFS
         is_sector_etf = t in SECTOR_THEME_ETFS or (quote_type in ['ETF', 'MUTUALFUND'] and not is_broad_etf)
         is_single_stock = not is_broad_etf and not is_sector_etf
 
         if is_broad_etf:
-            # 🌐 宽基 ETF 阈值：> 65% 高危, > 50% 预警
+            # 🌐 Broad ETF Thresholds: > 65% Danger, > 50% Notice
             if pct > 65.0:
                 suggestions.append({
                     "level": "DANGER",
-                    "title": f"🔴 宽基 ETF 占比极高: {t} 达 {pct:.1f}%",
-                    "desc": f"{t} 为全市场宽基 ETF，虽然分散度极佳，但超过 65% 使得组合缺乏其他风格资产（如高股息/增长型）的补充调节。"
+                    "title": f"🔴 Broad ETF Concentration High: {t} at {pct:.1f}%",
+                    "desc": f"{t} is a broad market ETF. While highly diversified, exceeding 65% limits exposure to complementary asset styles (such as dividend or high-growth assets)."
                 })
             elif pct > 50.0:
                 suggestions.append({
                     "level": "INFO",
-                    "title": f"🔵 核心压舱石持仓: {t} 占比 {pct:.1f}%",
-                    "desc": f"{t} 作为核心压舱石配置正常（>50%）。建议后续新入金可适度分配至卫星资产（如行业 ETF 或优质个股）。"
+                    "title": f"🔵 Core Anchor Position: {t} at {pct:.1f}%",
+                    "desc": f"{t} serves as a solid core holding (>50%). Future cash injections could be directed toward satellite assets (e.g., sector ETFs or individual stocks)."
                 })
 
         elif is_sector_etf:
-            # 🧱 行业/主题/高股息 ETF 阈值：> 45% 高危, > 35% 预警
+            # 🧱 Sector/Theme ETF Thresholds: > 45% Danger, > 35% Warning
             if pct > 45.0:
                 suggestions.append({
                     "level": "DANGER",
-                    "title": f"🔴 行业/主题 ETF 严重集中: {t} 占比 {pct:.1f}%",
-                    "desc": f"{t} 为行业/风格主题 ETF，占比超过 45% 容易让组合遭受单一行业（如科技挤估值或高股息跑输大盘）的周期性冲击。"
+                    "title": f"🔴 High Sector/Theme ETF Concentration: {t} at {pct:.1f}%",
+                    "desc": f"{t} is a sector/style ETF. Allocation above 45% exposes the portfolio to cyclical industry downturns or valuation compression."
                 })
             elif pct > 35.0:
                 suggestions.append({
                     "level": "WARNING",
-                    "title": f"🟡 行业/主题 ETF 占比偏高: {t} 占比 {pct:.1f}%",
-                    "desc": f"{t} 占比已超过 35%。建议暂停增持该主题，将新资金分配给宽基指数或低相关性资产。"
+                    "title": f"🟡 Elevated Sector/Theme ETF Weight: {t} at {pct:.1f}%",
+                    "desc": f"{t} weight exceeds 35%. Consider pausing additions to this theme and allocating new capital into broad indexes or uncorrelated assets."
                 })
 
         elif is_single_stock:
-            # 🏢 个股/单股票 阈值：> 30% 高危, > 15% 预警
+            # 🏢 Single Stock Thresholds: > 30% Danger, > 15% Warning
             if pct > 30.0:
                 suggestions.append({
                     "level": "DANGER",
-                    "title": f"🔴 单股票黑天鹅风险高危: {t} 占比高达 {pct:.1f}%",
-                    "desc": f"个股 {t} 占比已突破 30%！个股面临公司财报、管理层与行业竞争等特有风险，强烈建议锁定部分利润或止盈减仓。"
+                    "title": f"🔴 High Single-Stock Concentration Risk: {t} at {pct:.1f}%",
+                    "desc": f"Single stock {t} exceeds 30% of total portfolio value. Single stocks carry company-specific idiosyncratic risks; strongly consider trimming or locking in profits."
                 })
             elif pct > 15.0:
                 suggestions.append({
                     "level": "WARNING",
-                    "title": f"🟡 单个股集中度预警: {t} 占比 {pct:.1f}%",
-                    "desc": f"单个股票 {t} 权重超过 15%。建议将个股持仓控制在合理范围内，避免个股波动剧烈拉低整体组合表现。"
+                    "title": f"🟡 Single-Stock Weight Alert: {t} at {pct:.1f}%",
+                    "desc": f"Single stock {t} exceeds 15% weight. Keeping individual equity weights controlled helps mitigate overall portfolio volatility."
                 })
 
-    # 2. 穿透行业集中度诊断 (行业权重 > 45% 预警)
+    # 2. Look-through sector concentration (> 38% Warning, > 50% Danger)
     if not sector_p_df.empty:
         top_sector = sector_p_df.iloc[0]
         sec_name = top_sector['Sector']
@@ -367,21 +364,21 @@ def analyze_portfolio_health(portfolio_df, market_data, sector_p_df):
         if sec_weight > 50.0:
             suggestions.append({
                 "level": "DANGER",
-                "title": f"🔴 穿透行业严重暴露: {sec_name} 占比达 {sec_weight:.1f}%",
-                "desc": f"组合穿透后在 **{sec_name}** 行业的总体配置已过半（包含直接持股与 ETF 间接持股），行业集中风险较大。"
+                "title": f"🔴 Severe Sector Exposure: {sec_name} at {sec_weight:.1f}%",
+                "desc": f"Over half of total portfolio value is concentrated in the **{sec_name}** sector (combining direct stock holdings and ETF underlying holdings)."
             })
         elif sec_weight > 38.0:
             suggestions.append({
                 "level": "WARNING",
-                "title": f"🟡 穿透行业偏好集中: {sec_name} 占比 {sec_weight:.1f}%",
-                "desc": f"组合在 **{sec_name}** 行业配置较为集中（>38%），注意科技或相关行业的估值波动风险。"
+                "title": f"🟡 High Sector Preference: {sec_name} at {sec_weight:.1f}%",
+                "desc": f"Portfolio allocation is heavily concentrated in the **{sec_name}** sector (>38%). Be mindful of sector valuation swings."
             })
 
     if not suggestions:
         suggestions.append({
             "level": "SUCCESS",
-            "title": "🟢 资产风格分类配置健康",
-            "desc": "当前宽基 ETF、行业 ETF 与个股的配置比例符合风险控制标准，未发现异常集中度风险。"
+            "title": "🟢 Balanced Asset Allocation & Style Mix",
+            "desc": "Current allocation across broad ETFs, sector ETFs, and individual equities meets risk-control criteria with no severe concentration risks."
         })
 
     return suggestions
@@ -389,13 +386,13 @@ def analyze_portfolio_health(portfolio_df, market_data, sector_p_df):
 
 def calculate_portfolio_rebalance(portfolio_df, market_data, new_cash=0.0):
     """
-    根据用户设定的目标权重 (target_pct) 与新增入金 (new_cash)，
-    精确计算存量再平衡与新增资金分配的买卖指令
+    Calculates rebalance orders for existing holdings and new cash inflow
+    based on target weights (target_pct).
     """
     total_current_val = 0.0
     rows_data = []
 
-    # 1. 汇总各标的当前市值与目标权重
+    # 1. Aggregate current values and target weights
     for _, row in portfolio_df.iterrows():
         t = row['ticker'].strip().upper()
         shares = row['shares']
@@ -420,7 +417,7 @@ def calculate_portfolio_rebalance(portfolio_df, market_data, new_cash=0.0):
     target_total_val = total_current_val + new_cash
     orders = []
 
-    # 2. 计算各标的的目标市值与买卖指令
+    # 2. Calculate target values and buy/sell trade instructions
     for item in rows_data:
         t = item['ticker']
         price = item['price']
@@ -428,29 +425,27 @@ def calculate_portfolio_rebalance(portfolio_df, market_data, new_cash=0.0):
         curr_pct = (curr_val / total_current_val * 100) if total_current_val > 0 else 0.0
         target_pct = item['target_pct']
         
-        # 目标期望市值
         target_val = target_total_val * (target_pct / 100.0)
         diff_val = target_val - curr_val
         diff_shares = (diff_val / price) if price > 0 else 0.0
         
-        # 判定交易动作
-        if diff_val > 10:  # 买入阈值 $10
-            action = "🟢 买入 (BUY)"
-        elif diff_val < -10:  # 卖出阈值 -$10
-            action = "🔴 卖出 (SELL)"
+        if diff_val > 10:  # Buy threshold $10
+            action = "🟢 BUY"
+        elif diff_val < -10:  # Sell threshold -$10
+            action = "🔴 SELL"
         else:
-            action = "⚪ 保持 (HOLD)"
+            action = "⚪ HOLD"
             
         orders.append({
-            "代码": t,
-            "当前股价 ($)": price,
-            "当前市值 ($)": curr_val,
-            "当前实际权重 (%)": curr_pct,
-            "目标权重 (%)": target_pct,
-            "权重偏差 (%)": curr_pct - target_pct,
-            "再平衡建议动作": action,
-            "调整金额 ($)": abs(diff_val),
-            "调整股数": abs(diff_shares)
+            "Ticker": t,
+            "Current Price ($)": price,
+            "Current Value ($)": curr_val,
+            "Actual Weight (%)": curr_pct,
+            "Target Weight (%)": target_pct,
+            "Deviation (%)": curr_pct - target_pct,
+            "Action": action,
+            "Trade Amount ($)": abs(diff_val),
+            "Trade Shares": abs(diff_shares)
         })
 
     return pd.DataFrame(orders), total_current_val, target_total_val
@@ -458,15 +453,15 @@ def calculate_portfolio_rebalance(portfolio_df, market_data, new_cash=0.0):
 
 def calculate_portfolio_dividends(portfolio_df, market_data, raw_dividends_dict):
     """
-    穿透计算投资组合的加权股息率、预计年化现金流，
-    并根据各标的历史派息月份预估未来 12 个月的月度被动收入分布。
+    Calculates weighted dividend yield, projected annual cashflow, 
+    and estimated 12-month monthly passive income breakdown.
     """
     total_portfolio_value = 0.0
     total_annual_cashflow = 0.0
     monthly_cashflow = {m: 0.0 for m in range(1, 13)}
     breakdown_rows = []
 
-    # 1. 遍历持仓标的计算股息与派息月份
+    # 1. Iterate over holdings to compute dividends and payment months
     for _, row in portfolio_df.iterrows():
         t = row['ticker'].strip().upper()
         shares = row['shares']
@@ -477,15 +472,13 @@ def calculate_portfolio_dividends(portfolio_df, market_data, raw_dividends_dict)
         pos_val = shares * latest_price
         total_portfolio_value += pos_val
         
-        div_yield = m_info.get('div_yield', 0.0) # TTM 股息率 (%)
+        div_yield = m_info.get('div_yield', 0.0)  # TTM Dividend Yield (%)
         divs = raw_dividends_dict.get(t, pd.Series(dtype=float))
         
-        # 计算该标的预估年化派息总额
         annual_div_per_share = (div_yield / 100.0) * latest_price
         pos_annual_cashflow = shares * annual_div_per_share
         total_annual_cashflow += pos_annual_cashflow
         
-        # 识别该标的近一年的派息月份 (美股通常按季派息，如 3, 6, 9, 12 月)
         pay_months = []
         if not divs.empty:
             one_year_ago = datetime.now() - timedelta(days=365)
@@ -493,30 +486,27 @@ def calculate_portfolio_dividends(portfolio_df, market_data, raw_dividends_dict)
             if not recent_divs.empty:
                 pay_months = sorted(list(set(recent_divs.index.month)))
         
-        # 若无历史数据，默认美股标准季度派息 (3, 6, 9, 12 月)
+        # Default to standard quarterly dividend schedule (March, June, September, December)
         if not pay_months:
             pay_months = [3, 6, 9, 12]
             
-        # 将派息按月份平均归集
         div_per_payout = pos_annual_cashflow / len(pay_months) if pay_months else 0.0
         for m in pay_months:
             monthly_cashflow[m] += div_per_payout
             
         breakdown_rows.append({
-            "代码": t,
-            "当前持仓市值 ($)": pos_val,
-            "股息率 (TTM %)": div_yield,
-            "每股年派息 ($)": annual_div_per_share,
-            "预计年领股息 ($)": pos_annual_cashflow,
-            "历史派息月份": ", ".join([f"{m}月" for m in pay_months])
+            "Ticker": t,
+            "Market Value ($)": pos_val,
+            "Dividend Yield (TTM %)": div_yield,
+            "Annual Div / Share ($)": annual_div_per_share,
+            "Est. Annual Dividend ($)": pos_annual_cashflow,
+            "Payout Months": ", ".join([f"{m}" for m in pay_months])
         })
 
-    # 计算组合综合加权股息率
     portfolio_div_yield = (total_annual_cashflow / total_portfolio_value * 100.0) if total_portfolio_value > 0 else 0.0
 
-    # 构建月度现金流 DataFrame
     monthly_df = pd.DataFrame([
-        {"月份": f"{m}月", "Month_Num": m, "预计领息 ($)": monthly_cashflow[m]}
+        {"Month": f"M{m}", "Month_Num": m, "Est. Dividends ($)": monthly_cashflow[m]}
         for m in range(1, 13)
     ])
 

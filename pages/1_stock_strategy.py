@@ -7,7 +7,7 @@ from data import (
     filter_by_range, calculate_ttm_dividend_yield,
     get_asset_size_or_market_cap, get_range_years_limit
 )
-from strategy import analyze_trading_signal
+from strategy import analyze_trading_signal, calculate_ticker_performance_metrics
 from ui import (
     inject_custom_css, render_header, render_kpi_cards, 
     render_advice_card
@@ -83,29 +83,6 @@ render_kpi_cards(latest_price, price_change, pct_change, week_52_high, week_52_l
 trading_advice = analyze_trading_signal(hist, latest_price, week_52_high, week_52_low, div_yield)
 render_advice_card(trading_advice)
 
-# Calculate Risk & Return Performance Metrics / 计算阶段风险收益指标函数
-def calculate_ticker_performance_metrics(df):
-    if df.empty or len(df) < 2:
-        return 0.0, 0.0, 0.0
-    
-    start_price = df['Close'].iloc[0]
-    end_price = df['Close'].iloc[-1]
-    
-    # 1. Total Return / 累计总回报率
-    total_return = (end_price - start_price) / start_price
-    
-    # 2. Compound Annual Growth Rate (CAGR) / 年化回报率
-    days = (df.index[-1] - df.index[0]).days
-    years = days / 365.25
-    cagr = ((end_price / start_price) ** (1 / years) - 1) if years > 0 else 0.0
-    
-    # 3. Maximum Drawdown (MDD) / 最大回撤
-    roll_max = df['Close'].cummax()
-    drawdown = (df['Close'] - roll_max) / roll_max
-    max_drawdown = drawdown.min()  # negative float
-    
-    return total_return, cagr, max_drawdown
-
 total_ret, cagr_val, mdd_val = calculate_ticker_performance_metrics(filtered_hist)
 
 # Historical Price Trend Chart / 历史价格走势曲线
@@ -114,7 +91,7 @@ fig_price = px.line(
     filtered_hist, 
     x=filtered_hist.index,  # type: ignore
     y='Close',
-    labels={'Close': 'Price (USD)', 'Date': 'Date / 日期'},
+    labels={'Close': 'Price (USD)', 'Date': 'Date'},
     template="plotly"
 )
 fig_price.update_traces(
@@ -180,9 +157,9 @@ if is_etf:
             st.dataframe(
                 top_holdings,
                 column_config={
-                    "Ticker": st.column_config.TextColumn("Ticker / 代码"),
-                    "Company": st.column_config.TextColumn("Company / 公司名称"),
-                    "Weight (%)": st.column_config.ProgressColumn("Weight / 权重占比", format="%.1f%%", min_value=0, max_value=20)
+                    "Ticker": st.column_config.TextColumn("Ticker"),
+                    "Company": st.column_config.TextColumn("Company"),
+                    "Weight (%)": st.column_config.ProgressColumn("Weight", format="%.1f%%", min_value=0, max_value=20)
                 },
                 hide_index=True,
                 use_container_width=True,
@@ -193,10 +170,10 @@ if is_etf:
 else:
     st.markdown(f'<div class="section-title">🏢 {user_ticker} Key Financial Metrics</div>', unsafe_allow_html=True)
     c1, c2, c3, c4 = st.columns(4)
-    c1.metric("P/E (TTM) / 市盈率", f"{info.get('trailingPE', 0):.2f}" if info.get('trailingPE') else "N/A")
-    c2.metric("Forward P/E / 远期市盈率", f"{info.get('forwardPE', 0):.2f}" if info.get('forwardPE') else "N/A")
-    c3.metric("P/B Ratio / 市净率", f"{info.get('priceToBook', 0):.2f}" if info.get('priceToBook') else "N/A")
-    c4.metric("Profit Margin / 净利润率", f"{info.get('profitMargins', 0)*100:.1f}%" if info.get('profitMargins') else "N/A") # type: ignore
+    c1.metric("P/E (TTM)", f"{info.get('trailingPE', 0):.2f}" if info.get('trailingPE') else "N/A")
+    c2.metric("Forward P/E", f"{info.get('forwardPE', 0):.2f}" if info.get('forwardPE') else "N/A")
+    c3.metric("P/B Ratio", f"{info.get('priceToBook', 0):.2f}" if info.get('priceToBook') else "N/A")
+    c4.metric("Profit Margin", f"{info.get('profitMargins', 0)*100:.1f}%" if info.get('profitMargins') else "N/A") # type: ignore
 
     st.markdown("<br>", unsafe_allow_html=True)
     st.markdown("##### 📝 Business Profile")
@@ -258,7 +235,7 @@ with col_dividend:
             line_color="#0F766E", 
             marker_color="#14B8A6", 
             marker_size=8,
-            hovertemplate="Year / 年份: %{x}<br>Dividend / 每股分红: <b>$%{y:.2f}</b><extra></extra>"
+            hovertemplate="Year: %{x}<br>Dividend: <b>$%{y:.2f}</b><extra></extra>"
         )
         fig_div.update_layout(
             yaxis_title="", 
