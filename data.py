@@ -131,7 +131,7 @@ def fetch_ticker_fundamentals(tickers):
             exp_ratio = info.get("expenseRatio") or info.get("netExpenseRatio")
             
             if exp_ratio is not None:
-                exp_ratio_str = f"{exp_ratio * 100:.2f}%" if exp_ratio < 1 else f"{exp_ratio:.2f}%"
+                exp_ratio_str = f"{exp_ratio * 100:.2f}%" if exp_ratio < 0.01 else f"{exp_ratio:.2f}%"
             else:
                 exp_ratio_str = "N/A (Stock)"
                 
