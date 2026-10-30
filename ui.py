@@ -413,7 +413,7 @@ def render_rebalance_dashboard(rebalance_df, total_current_val, target_total_val
     st.markdown("##### 🛒 Rebalance Trade Instructions")
     
     if not rebalance_df.empty:
-        total_target_pct = rebalance_df["Target Weight (%)"].sum() if "Target Weight (%)" in rebalance_df.columns else rebalance_df.get("目标权重 (%)", pd.Series([100])).sum()
+        total_target_pct = rebalance_df["Target Weight (%)"].sum() if "Target Weight (%)" in rebalance_df.columns else 0.0
         if abs(total_target_pct - 100.0) > 0.1:
             st.warning(f"⚠️ Current target weight sum is **{total_target_pct:.1f}%**. Consider adjusting so the sum equals **100%**.")
         else:
