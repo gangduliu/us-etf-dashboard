@@ -27,6 +27,7 @@ def inject_custom_css():
             margin-bottom: 24px;
             box-shadow: 0 10px 15px -3px rgba(15, 118, 110, 0.25);
         }}
+
         .header-banner h1 {{
             color: #FFFFFF !important;
             font-weight: 700;
@@ -34,10 +35,17 @@ def inject_custom_css():
             margin: 0 0 6px 0;
             letter-spacing: -0.02em;
         }}
+
         .header-banner p {{
             color: #CCFBF1 !important;
             font-size: 0.9rem;
             margin: 0;
+        }}
+
+        .section-title {{
+            font-size: 1.1rem;
+            font-weight: 700;
+            margin-bottom: 16px;
         }}
 
         [data-testid="stMetric"] {{
@@ -50,10 +58,12 @@ def inject_custom_css():
             overflow: hidden;
             min-height: 110px;
         }}
+
         [data-testid="stMetric"]:hover {{
             transform: translateY(-2px);
             border-color: rgba(15, 118, 110, 0.4);
         }}
+
         [data-testid="stMetric"]::before {{
             content: "";
             position: absolute;
@@ -76,52 +86,12 @@ def inject_custom_css():
             letter-spacing: -0.02em;
         }}
 
-        /* Tab List Container: Modern capsule base, adaptive background and border */
-        .stTabs [data-baseweb="tab-list"] {{
-            gap: 8px;
-            background-color: var(--secondary-background-color);
-            padding: 6px;
-            border-radius: 12px;
-            border: 1px solid var(--border-color);
-            margin-bottom: 20px;
+        div[data-testid="stMultiSelectTagsContainer"] span {{
+            background-color: {PRIMARY_COLOR};
         }}
 
-        /* Individual Tab Button: 0.25s smooth bezier transition */
-        .stTabs [data-baseweb="tab"] {{
-            height: 40px;
-            border-radius: 8px !important;
-            color: var(--text-color) !important;
-            font-weight: 500 !important;
-            font-size: 0.9rem !important;
-            transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
-            border: none !important;
-            background-color: transparent !important;
-            padding: 0 16px !important;
-        }}
-
-        /* Hover effect: Smooth subtle glow and text color shift */
-        .stTabs [data-baseweb="tab"]:hover {{
-            background-color: rgba(15, 118, 110, 0.08) !important;
-            color: var(--primary-color) !important;
-        }}
-
-        /* Selected Tab state: Primary color fill with shadow */
-        .stTabs [data-baseweb="tab"][aria-selected="true"] {{
-            background-color: var(--primary-color) !important;
-            color: #FFFFFF !important;
-            font-weight: 600 !important;
-            box-shadow: 0 4px 12px rgba(15, 118, 110, 0.25);
-        }}
-
-        /* Hide default bottom highlight bar */
-        .stTabs [data-baseweb="tab-highlight"] {{
-            display: none !important;
-        }}
-        
-        .section-title {{
-            font-size: 1.1rem;
-            font-weight: 700;
-            margin-bottom: 16px;
+        div[data-testid="stMultiSelectTagsContainer"] span {{
+            color: #FFFFFF;
         }}
     </style>
     """, unsafe_allow_html=True)
@@ -162,7 +132,7 @@ def render_kpi_cards(latest_price, price_change, pct_change, week_52_high, week_
     col3.metric(
         label="Dividend Yield (TTM)",
         value=f"{div_yield:.2f}%",
-        delta="Based on last 12M payouts",
+        delta="Last 12M",
         delta_color="off"
     )
 
@@ -173,7 +143,7 @@ def render_kpi_cards(latest_price, price_change, pct_change, week_52_high, week_
         col4.metric(
             label="Expense Ratio",
             value=f"{expense}%" if expense else "N/A",
-            delta="Index fund fee",
+            delta="Fund fee",
             delta_color="off"
         )
         col5.metric(
