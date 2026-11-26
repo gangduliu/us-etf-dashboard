@@ -52,7 +52,7 @@ with st.sidebar:
         """
         <div style="text-align: center; margin-bottom: 10px;">
             <p style="font-size: 0.85rem; opacity: 0.8; margin-bottom: 10px;">If this dashboard has been helpful to you, feel free to buy me a lime! 🍋‍🟩</p>
-            <a href="https://buymeacoffee.com/qingning618" target="_blank">
+            <a href="https://buymeacoffee.com/qingning618/us-etf-dashboard" target="_blank">
                 <img src="https://img.buymeacoffee.com/button-api/?text=Buy me a lime&emoji=🍋‍🟩&slug=qingning618&button_colour=0F766E&font_colour=ffffff&font_family=Inter&outline_colour=ffffff&coffee_colour=FFDD00" style="width: 100%;" alt="Buy Me A Lime">
             </a>
         </div>

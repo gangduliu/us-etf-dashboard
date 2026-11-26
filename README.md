@@ -30,7 +30,7 @@ This is a professional-grade **US Stock & ETF Analysis and Portfolio Management 
 ### 📂 Directory Structure
 ```text
 .
-├── app.py                      # 🏠 Root router & global sidebar (includes donation links)
+├── app.py                      # 🏠 Root router & global sidebar
 ├── pages/                      # 📁 Streamlit multi-page directory
 │   ├── 1_stock_strategy.py   # Single asset trend, quantitative signals & financial metrics
 │   ├── 2_comparison.py       # Multi-asset performance comparison & risk analytics
@@ -48,4 +48,4 @@ This is a professional-grade **US Stock & ETF Analysis and Portfolio Management 
 
 If you find my projects or tools helpful, feel free to buy me a coffee! Your support helps keep my open-source tools running and motivates me to build more.
 
-[![Buy me a lime](https://img.buymeacoffee.com/button-api/?text=Buy%20me%20a%20lime&emoji=🍋‍🟩&slug=qingning618&button_colour=40DCA5&font_colour=ffffff&font_family=Cookie&outline_colour=000000&coffee_colour=FFDD00)](https://www.buymeacoffee.com/qingning618)
+[![Buy me a lime](https://img.buymeacoffee.com/button-api/?text=Buy%20me%20a%20lime&emoji=🍋‍🟩&slug=qingning618&button_colour=40DCA5&font_colour=ffffff&font_family=Cookie&outline_colour=000000&coffee_colour=FFDD00)](https://buymeacoffee.com/qingning618/us-etf-dashboard)
