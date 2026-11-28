@@ -1,6 +1,7 @@
 # 📊 US Stock & ETF Analysis & Portfolio Management Dashboard
 
-🔗 **Live Demo**: [https://us-etf-dashboard-mbgpiwkqkt38tbatgqzdal.streamlit.app/](https://us-etf-dashboard-mbgpiwkqkt38tbatgqzdal.streamlit.app/)
+* **Live Demo**: [US Stock Analysis Dashboard](https://us-etf-dashboard-mbgpiwkqkt38tbatgqzdal.streamlit.app/)
+* **Introducation**: [US Stock Analysis Dashboard](https://buymeacoffee.com/qingning618/us-etf-dashboard)
 
 ---
 
@@ -48,4 +49,4 @@ This is a professional-grade **US Stock & ETF Analysis and Portfolio Management 
 
 If you find my projects or tools helpful, feel free to buy me a coffee! Your support helps keep my open-source tools running and motivates me to build more.
 
-[![Buy me a lime](https://img.buymeacoffee.com/button-api/?text=Buy%20me%20a%20lime&emoji=🍋‍🟩&slug=qingning618&button_colour=40DCA5&font_colour=ffffff&font_family=Cookie&outline_colour=000000&coffee_colour=FFDD00)](https://buymeacoffee.com/qingning618/us-etf-dashboard)
+[![Buy me a lime](https://img.buymeacoffee.com/button-api/?text=Buy%20me%20a%20lime&emoji=🍋‍🟩&slug=qingning618&button_colour=40DCA5&font_colour=ffffff&font_family=Cookie&outline_colour=000000&coffee_colour=FFDD00)](https://buymeacoffee.com/qingning618)
